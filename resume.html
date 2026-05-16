@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harriet Ebome | AI & Fintech Product Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #070b14;
+      --card: rgba(18, 25, 44, 0.72);
+      --text: #f4f7ff;
+      --muted: #b5c0da;
+      --primary: #7c5cff;
+      --secondary: #00d9ff;
+      --accent: #00ffa3;
+      --border: rgba(255,255,255,0.08);
+      --glow: 0 0 25px rgba(124, 92, 255, 0.35);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top left, rgba(124,92,255,0.25), transparent 30%),
+                  radial-gradient(circle at bottom right, rgba(0,217,255,0.18), transparent 30%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding: 40px;
+    }
+
+    .background-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: -1;
+      mask-image: radial-gradient(circle at center, black 30%, transparent 85%);
+    }
+
+    .resume {
+      max-width: 1250px;
+      margin: auto;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 28px;
+    }
+
+    .sidebar,
+    .main {
+      background: var(--card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 30px;
+      box-shadow: var(--glow);
+    }
+
+    .profile {
+      text-align: center;
+      margin-bottom: 35px;
+    }
+
+    .avatar {
+      width: 120px;
+      height: 120px;
+      margin: auto;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .avatar::before {
+      content: '';
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(transparent, rgba(255,255,255,0.2), transparent);
+      transform: rotate(45deg);
+      animation: shine 4s linear infinite;
+    }
+
+    @keyframes shine {
+      0% { transform: translateX(-100%) rotate(45deg); }
+      100% { transform: translateX(100%) rotate(45deg); }
+    }
+
+    h1 {
+      font-size: 30px;
+      margin-bottom: 8px;
+    }
+
+    .role {
+      color: var(--secondary);
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 15px;
+    }
+
+    .summary {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+
+    .section-title::before {
+      content: '';
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      box-shadow: 0 0 15px var(--secondary);
+    }
+
+    .contact-item,
+    .skill,
+    .achievement,
+    .interest {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 12px 14px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      transition: 0.3s ease;
+    }
+
+    .contact-item:hover,
+    .skill:hover,
+    .achievement:hover,
+    .interest:hover,
+    .timeline-item:hover {
+      transform: translateY(-3px);
+      border-color: rgba(0,217,255,0.35);
+      box-shadow: 0 0 18px rgba(0,217,255,0.15);
+    }
+
+    .contact-item span {
+      display: block;
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 13px;
+    }
+
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .skill {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .main-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 35px;
+      gap: 20px;
+    }
+
+    .badge {
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(124,92,255,0.25), rgba(0,217,255,0.15));
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 20px;
+      border-left: 2px solid rgba(255,255,255,0.08);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 24px;
+      padding: 22px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: 0.3s ease;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -31px;
+      top: 28px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      box-shadow: 0 0 15px var(--secondary);
+    }
+
+    .job-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .company {
+      color: var(--secondary);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .duration {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+
+    .timeline-item ul {
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    .project-card {
+      padding: 22px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .project-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(124,92,255,0.12), rgba(0,217,255,0.08));
+      opacity: 0;
+      transition: 0.3s ease;
+    }
+
+    .project-card:hover::before {
+      opacity: 1;
+    }
+
+    .project-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .project-card h3 {
+      position: relative;
+      z-index: 2;
+      margin-bottom: 10px;
+    }
+
+    .project-card p {
+      position: relative;
+      z-index: 2;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .footer {
+      margin-top: 35px;
+      padding-top: 25px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .typing {
+      color: var(--accent);
+      font-weight: 600;
+      min-height: 24px;
+    }
+
+    @media (max-width: 980px) {
+      .resume {
+        grid-template-columns: 1fr;
+      }
+
+      body {
+        padding: 18px;
+      }
+
+      .main-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="background-grid"></div>
+
+  <div class="resume">
+
+    <aside class="sidebar">
+      <div class="profile">
+        <div class="avatar">HE</div>
+        <h1>Harriet Ebome</h1>
+        <div class="role">AI & Fintech Product Manager</div>
+        <p class="summary">
+          Product Manager with experience building fintech and AI-powered digital products.
+          Passionate about solving real-world problems across payments, AI, healthcare innovation,
+          and user-centered product experiences.
+        </p>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Contact</div>
+
+        <div class="contact-item">
+          Lagos, Nigeria
+          <span>Open to Remote & International Roles</span>
+        </div>
+
+        <div class="contact-item">
+          LinkedIn
+          <span>Add your LinkedIn URL here</span>
+        </div>
+
+        <div class="contact-item">
+          Email
+          <span>yourmail@email.com</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Core Skills</div>
+
+        <div class="skills-grid">
+          <div class="skill">Product Strategy</div>
+          <div class="skill">AI Products</div>
+          <div class="skill">Fintech</div>
+          <div class="skill">User Research</div>
+          <div class="skill">Roadmapping</div>
+          <div class="skill">PRDs</div>
+          <div class="skill">Payments</div>
+          <div class="skill">Growth</div>
+          <div class="skill">API Integrations</div>
+          <div class="skill">Figma</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Achievements</div>
+
+        <div class="achievement">
+          Led fintech payment product initiatives across virtual accounts, recurring payments, and disbursement systems.
+        </div>
+
+        <div class="achievement">
+          Transitioning into AI Product Management with focus on intelligent workflows and healthcare innovation.
+        </div>
+
+        <div class="achievement">
+          Built digital product concepts including Promptli, eCasher, and xPressPayout.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Interests</div>
+
+        <div class="interest">AI Product Management</div>
+        <div class="interest">Health Tech</div>
+        <div class="interest">Fintech Innovation</div>
+        <div class="interest">Digital Transformation</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-header">
+        <div>
+          <h1>Resume Overview</h1>
+          <div class="typing" id="typing-text"></div>
+        </div>
+
+        <div class="badge">
+          Product • AI • Fintech • Innovation
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Professional Experience</div>
+
+        <div class="timeline">
+
+          <div class="timeline-item">
+            <div class="job-title">Product Manager – Digital Payments</div>
+            <div class="company">Global Accelerex</div>
+            <div class="duration">Fintech & Payment Infrastructure</div>
+
+            <ul>
+              <li>Led strategy and product development initiatives for the Rexpay payment platform.</li>
+              <li>Managed integrations with NIBSS, Mono, Interswitch, and Afrigo payment systems.</li>
+              <li>Improved product capabilities across recurring billing, virtual accounts, API documentation, and international card acceptance.</li>
+              <li>Collaborated with engineering, compliance, operations, and business teams to deliver scalable payment experiences.</li>
+            </ul>
+          </div>
+
+          <div class="timeline-item">
+            <div class="job-title">AI Product Management Transition</div>
+            <div class="company">Independent Learning & Product Development</div>
+            <div class="duration">Current Focus</div>
+
+            <ul>
+              <li>Exploring AI-powered product systems focused on workflow automation and intelligent user experiences.</li>
+              <li>Designing Promptli, an AI-focused product concept built around prompts, productivity, and user workflows.</li>
+              <li>Researching opportunities across AI, healthcare innovation, and global product ecosystems.</li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Featured Projects</div>
+
+        <div class="projects">
+
+          <div class="project-card">
+            <h3>Promptli</h3>
+            <p>
+              AI-powered product concept focused on prompt workflows, user productivity, and intelligent digital assistance.
+            </p>
+          </div>
+
+          <div class="project-card">
+            <h3>Rexpay</h3>
+            <p>
+              Fintech payment platform supporting collections, disbursements, virtual accounts, and payment infrastructure integrations.
+            </p>
+          </div>
+
+          <div class="project-card">
+            <h3>xPressPayout</h3>
+            <p>
+              Product initiative focused on fast and scalable payout experiences for digital financial transactions.
+            </p>
+          </div>
+
+          <div class="project-card">
+            <h3>eCasher</h3>
+            <p>
+              Digital payment product concept designed to improve transaction accessibility and user payment experiences.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Education & Future Goals</div>
+
+        <div class="timeline-item">
+          <div class="job-title">Graduate Study Goals</div>
+          <div class="company">AI, Innovation & Product Leadership</div>
+
+          <ul>
+            <li>Pursuing opportunities in AI product management, innovation strategy, and healthcare technology.</li>
+            <li>Interested in fully funded international master's and PhD pathways.</li>
+            <li>Focused on building products that combine AI, accessibility, fintech, and human-centered design.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        Designed as a futuristic interactive resume • HTML • CSS • JavaScript
+      </div>
+    </main>
+
+  </div>
+
+  <script>
+    const phrases = [
+      'Building AI-powered products for the future...',
+      'Fintech Product Manager transitioning into AI...',
+      'Focused on innovation, systems, and user experience...',
+      'Exploring health tech, AI, and global opportunities...'
+    ];
+
+    const typingElement = document.getElementById('typing-text');
+
+    let phraseIndex = 0;
+    let letterIndex = 0;
+    let isDeleting = false;
+
+    function typeEffect() {
+      const currentPhrase = phrases[phraseIndex];
+
+      if (!isDeleting) {
+        typingElement.textContent = currentPhrase.substring(0, letterIndex + 1);
+        letterIndex++;
+
+        if (letterIndex === currentPhrase.length) {
+          isDeleting = true;
+          setTimeout(typeEffect, 1800);
+          return;
+        }
+      } else {
+        typingElement.textContent = currentPhrase.substring(0, letterIndex - 1);
+        letterIndex--;
+
+        if (letterIndex === 0) {
+          isDeleting = false;
+          phraseIndex = (phraseIndex + 1) % phrases.length;
+        }
+      }
+
+      setTimeout(typeEffect, isDeleting ? 40 : 80);
+    }
+
+    typeEffect();
+
+    document.querySelectorAll('.timeline-item, .project-card, .skill').forEach((card) => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        card.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(124,92,255,0.18), rgba(255,255,255,0.03))`;
+      });
+
+      card.addEventListener('mouseleave', () => {
+        card.style.background = 'rgba(255,255,255,0.03)';
+      });
+    });
+  </script>
+
+</body>
+</html>
