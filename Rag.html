@@ -1,770 +1,1610 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG Simulator — Interactive Pipeline</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --accent: #38bdf8;
-            --accent2: #818cf8;
-            --success: #34d399;
-            --warning: #fbbf24;
-            --text: #f1f5f9;
-            --text-dim: #94a3b8;
-            --border: #334155;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            min-height: 100vh;
-            padding: 2rem;
-        }
-        h1 { text-align: center; font-size: 2.2rem; margin-bottom: 0.5rem; }
-        .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 2rem; font-size: 0.95rem; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Simulator — Learn How Retrieval-Augmented Generation Works</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .pipeline {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            max-width: 900px;
-            margin: 0 auto;
-        }
+  :root {
+    --bg: #080c14;
+    --bg2: #0d1320;
+    --bg3: #111827;
+    --surface: #151d2e;
+    --surface2: #1a2336;
+    --border: rgba(99,132,199,0.15);
+    --border2: rgba(99,132,199,0.28);
+    --accent: #4f8ef7;
+    --accent2: #7eb4ff;
+    --accent-dim: rgba(79,142,247,0.12);
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.1);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.1);
+    --coral: #f87171;
+    --coral-dim: rgba(248,113,113,0.1);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.1);
+    --teal: #22d3ee;
+    --teal-dim: rgba(34,211,238,0.1);
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --mono: 'Space Mono', monospace;
+    --display: 'Syne', sans-serif;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
 
-        .stage {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1.5rem;
-            position: relative;
-            transition: all 0.4s ease;
-            opacity: 0.4;
-            transform: translateY(20px);
-        }
-        .stage.active {
-            opacity: 1;
-            transform: translateY(0);
-            border-color: var(--accent);
-            box-shadow: 0 0 30px rgba(56,189,248,0.1);
-        }
-        .stage.done { opacity: 1; transform: translateY(0); border-color: var(--success); }
+  body {
+    font-family: var(--mono);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
-        .stage-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        .stage-num {
-            width: 32px; height: 32px;
-            border-radius: 50%;
-            background: var(--border);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 0.9rem;
-            transition: all 0.3s;
-        }
-        .stage.active .stage-num { background: var(--accent); color: var(--bg); }
-        .stage.done .stage-num { background: var(--success); color: var(--bg); }
-        .stage-title { font-size: 1.2rem; font-weight: 600; }
-        .stage-desc { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem; }
+  /* ─── GRID TEXTURE ─── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(79,142,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,142,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
 
-        .visual-box {
-            background: rgba(15,23,42,0.6);
-            border-radius: 12px;
-            padding: 1rem;
-            min-height: 80px;
-            font-family: 'SF Mono', monospace;
-            font-size: 0.85rem;
-            line-height: 1.6;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-break: break-word;
-            border: 1px dashed var(--border);
-        }
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
 
-        .chunk-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 0.5rem;
-        }
-        .chunk {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.6rem;
-            font-size: 0.75rem;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .chunk.highlight {
-            border-color: var(--warning);
-            background: rgba(251,191,36,0.1);
-            transform: scale(1.05);
-        }
+  /* ─── HEADER ─── */
+  header {
+    text-align: center;
+    margin-bottom: 52px;
+  }
 
-        .vector-demo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-        .vector-bar {
-            display: flex;
-            gap: 2px;
-            align-items: flex-end;
-            height: 60px;
-        }
-        .v-col {
-            width: 8px;
-            background: var(--accent2);
-            border-radius: 2px;
-            transition: height 0.5s ease;
-        }
-        .v-col.query { background: var(--accent); }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 100px;
+    padding: 5px 14px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--accent2);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
 
-        .retrieved-docs {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .doc-item {
-            background: var(--bg);
-            border-left: 3px solid var(--warning);
-            padding: 0.75rem 1rem;
-            border-radius: 0 8px 8px 0;
-            font-size: 0.85rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .score { color: var(--warning); font-weight: 600; font-size: 0.8rem; }
+  .badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
 
-        .prompt-box {
-            background: var(--bg);
-            border: 1px solid var(--accent);
-            border-radius: 10px;
-            padding: 1rem;
-            font-size: 0.85rem;
-            line-height: 1.7;
-        }
-        .prompt-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
-        .context-block { background: rgba(56,189,248,0.08); padding: 0.5rem; border-radius: 6px; margin: 0.5rem 0; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
 
-        .answer-box {
-            background: linear-gradient(135deg, rgba(52,211,153,0.1), rgba(56,189,248,0.1));
-            border: 1px solid var(--success);
-            border-radius: 12px;
-            padding: 1.25rem;
-            font-size: 1rem;
-            line-height: 1.7;
-            position: relative;
-        }
-        .answer-box::before {
-            content: "✦ Generated Answer";
-            position: absolute;
-            top: -10px;
-            left: 16px;
-            background: var(--card);
-            padding: 0 8px;
-            color: var(--success);
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #e2e8f0 0%, #7eb4ff 50%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 14px;
+  }
 
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin: 2rem 0 1rem;
-            flex-wrap: wrap;
-        }
-        button {
-            background: var(--accent);
-            color: var(--bg);
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.95rem;
-        }
-        button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(56,189,248,0.3); }
-        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
-        button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .subtitle {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.7;
+    max-width: 520px;
+    margin: 0 auto;
+  }
 
-        .input-area {
-            max-width: 900px;
-            margin: 0 auto 2rem;
-            display: flex;
-            gap: 0.75rem;
-        }
-        input[type="text"] {
-            flex: 1;
-            background: var(--card);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 0.9rem 1.2rem;
-            border-radius: 12px;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        input[type="text"]:focus { border-color: var(--accent); }
+  /* ─── PIPELINE STEPS ─── */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 40px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
 
-        .arrow {
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 1.5rem;
-            margin: -0.5rem 0;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .arrow.show { opacity: 1; }
+  .pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+  }
 
-        .typing-cursor::after {
-            content: "|";
-            animation: blink 1s infinite;
-            color: var(--accent);
-        }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .pipe-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
 
-        .legend {
-            display: flex;
-            gap: 1.5rem;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 2rem;
-            font-size: 0.8rem;
-            color: var(--text-dim);
-        }
-        .legend-item { display: flex; align-items: center; gap: 0.4rem; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; }
-        .dot.waiting { background: var(--border); }
-        .dot.active { background: var(--accent); }
-        .dot.done { background: var(--success); }
+  .pipe-btn:hover { border-color: var(--border2); color: var(--text2); }
 
-        .knowledge-base {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.75rem;
-        }
-        .kb-doc {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1rem;
-            font-size: 0.8rem;
-            transition: all 0.3s;
-        }
-        .kb-doc.active { border-color: var(--accent); box-shadow: 0 0 15px rgba(56,189,248,0.15); }
-        .kb-title { font-weight: 600; color: var(--accent); margin-bottom: 0.4rem; font-size: 0.85rem; }
-        .kb-content { color: var(--text-dim); line-height: 1.5; }
+  .pipe-btn.active {
+    background: var(--accent-dim);
+    border-color: rgba(79,142,247,0.5);
+    color: var(--accent2);
+  }
 
-        .similarity-matrix {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .sim-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.8rem;
-        }
-        .sim-label { width: 80px; color: var(--text-dim); text-align: right; }
-        .sim-bar-bg {
-            flex: 1;
-            height: 20px;
-            background: var(--bg);
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .sim-bar {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent2), var(--accent));
-            border-radius: 10px;
-            transition: width 1s ease;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            padding-right: 8px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--bg);
-        }
-    </style>
-<base target="_blank">
+  .pipe-btn.done {
+    border-color: rgba(52,211,153,0.4);
+    color: var(--green);
+    background: var(--green-dim);
+  }
+
+  .pipe-num {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .pipe-arrow {
+    width: 24px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  /* ─── MAIN STAGE ─── */
+  .stage {
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+  .stage.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .stage-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stage-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    border: 1px solid var(--border2);
+  }
+
+  .stage-meta { flex: 1; }
+
+  .stage-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 4px;
+  }
+
+  .stage-title {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .stage-desc {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.7;
+  }
+
+  /* ─── CARDS / PANELS ─── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ─── INPUTS ─── */
+  textarea, input[type=text] {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 12px 16px;
+    line-height: 1.7;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus, input[type=text]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
+  }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 700;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent2); background: var(--accent-dim); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #6aa0f8; border-color: #6aa0f8; color: #fff; }
+
+  .btn-sm {
+    padding: 6px 14px;
+    font-size: 11px;
+  }
+
+  /* ─── DOCUMENT CORPUS ─── */
+  .doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .doc-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .doc-card:hover { border-color: var(--border2); }
+
+  .doc-card.selected {
+    border-color: rgba(52,211,153,0.5);
+    background: var(--green-dim);
+  }
+
+  .doc-card-icon { font-size: 20px; margin-bottom: 8px; }
+
+  .doc-card-title {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .doc-card-snippet {
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.5;
+  }
+
+  .doc-check {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--green);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #000;
+    font-weight: 700;
+  }
+
+  .doc-card.selected .doc-check { display: flex; }
+
+  /* ─── CHUNKS ─── */
+  .chunks-grid {
+    display: grid;
+    gap: 10px;
+  }
+
+  .chunk {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    transition: all 0.2s;
+  }
+
+  .chunk.highlighted {
+    border-color: rgba(79,142,247,0.5);
+    background: var(--accent-dim);
+  }
+
+  .chunk-id {
+    font-size: 10px;
+    color: var(--accent2);
+    background: var(--accent-dim);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 4px;
+    padding: 2px 7px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
+  .chunk-text {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  /* ─── EMBEDDINGS ─── */
+  .embedding-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    animation: slideIn 0.4s ease both;
+  }
+
+  .embedding-row:last-child { border-bottom: none; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .embed-label {
+    font-size: 11px;
+    color: var(--text2);
+    width: 180px;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .embed-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: var(--bg2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .embed-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--purple));
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .embed-vec {
+    font-size: 10px;
+    color: var(--text3);
+    width: 140px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* ─── RETRIEVAL / SIMILARITY ─── */
+  .retrieval-grid {
+    display: grid;
+    gap: 10px;
+  }
+
+  .retrieval-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    transition: all 0.3s;
+  }
+
+  .retrieval-item.match {
+    border-color: rgba(52,211,153,0.4);
+    background: var(--green-dim);
+  }
+
+  .sim-score {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 2px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: var(--text2);
+  }
+
+  .sim-score.high { border-color: var(--green); color: var(--green); }
+  .sim-score.med  { border-color: var(--amber); color: var(--amber); }
+  .sim-score.low  { border-color: var(--coral); color: var(--coral); }
+
+  .retrieval-content { flex: 1; }
+
+  .retrieval-text {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-bottom: 6px;
+  }
+
+  .retrieval-meta {
+    font-size: 10px;
+    color: var(--text3);
+    display: flex;
+    gap: 12px;
+  }
+
+  .score-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--bg3);
+    margin-top: 6px;
+    overflow: hidden;
+  }
+
+  .score-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ─── PROMPT BUILDER ─── */
+  .prompt-block {
+    background: var(--bg2);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .prompt-block::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  .prompt-block.system::before { background: var(--purple); }
+  .prompt-block.context::before { background: var(--green); }
+  .prompt-block.query::before { background: var(--accent); }
+
+  .prompt-block-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .prompt-block.system .prompt-block-label { color: var(--purple); }
+  .prompt-block.context .prompt-block-label { color: var(--green); }
+  .prompt-block.query .prompt-block-label { color: var(--accent2); }
+
+  .highlight { background: rgba(79,142,247,0.15); border-radius: 3px; padding: 0 2px; color: var(--accent2); }
+  .highlight-green { background: rgba(52,211,153,0.12); border-radius: 3px; padding: 0 2px; color: var(--green); }
+
+  /* ─── RESPONSE / LLM ─── */
+  .llm-response {
+    background: var(--bg2);
+    border: 1px solid rgba(167,139,250,0.25);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .llm-response::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top right, rgba(167,139,250,0.05), transparent 60%);
+    pointer-events: none;
+  }
+
+  .llm-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .llm-avatar {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--purple), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .llm-name {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .llm-model {
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  .typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 14px;
+    background: var(--purple);
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .response-text {
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--text);
+  }
+
+  /* ─── NAVIGATION ─── */
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 28px;
+  }
+
+  /* ─── VECTOR SPACE VIZ ─── */
+  .vector-canvas {
+    width: 100%;
+    height: 220px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: block;
+    margin-top: 16px;
+  }
+
+  /* ─── TOKEN COUNTER ─── */
+  .token-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .token {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    transition: all 0.3s;
+    cursor: default;
+  }
+
+  .token.active { background: var(--accent-dim); border-color: rgba(79,142,247,0.4); color: var(--accent2); }
+
+  /* ─── PROGRESS OVERVIEW ─── */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .overview-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: center;
+    transition: all 0.3s;
+  }
+
+  .overview-card.done {
+    border-color: rgba(52,211,153,0.3);
+    background: var(--green-dim);
+  }
+
+  .overview-num {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text3);
+    transition: color 0.3s;
+  }
+
+  .overview-card.done .overview-num { color: var(--green); }
+
+  .overview-label {
+    font-size: 10px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-top: 4px;
+  }
+
+  /* ─── STEP INDICATOR ─── */
+  .step-indicator {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 8px;
+  }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ─── GLOW EFFECT ─── */
+  .glow-accent { box-shadow: 0 0 20px rgba(79,142,247,0.1); }
+  .glow-green  { box-shadow: 0 0 20px rgba(52,211,153,0.1); }
+
+  /* ─── INFO CALLOUT ─── */
+  .callout {
+    background: var(--accent-dim);
+    border: 1px solid rgba(79,142,247,0.25);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 11px;
+    color: var(--accent2);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .callout-amber {
+    background: var(--amber-dim);
+    border-color: rgba(251,191,36,0.25);
+    color: var(--amber);
+  }
+
+  .callout-green {
+    background: var(--green-dim);
+    border-color: rgba(52,211,153,0.25);
+    color: var(--green);
+  }
+
+  /* ─── FLEX UTILS ─── */
+  .flex { display: flex; gap: 10px; align-items: center; }
+  .flex-end { justify-content: flex-end; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .mb16 { margin-bottom: 16px; }
+  .gap-sm { gap: 6px; }
+  code { font-family: var(--mono); }
+</style>
 </head>
 <body>
-    <h1>🔍 RAG Pipeline Simulator</h1>
-    <p class="subtitle">Watch how Retrieval-Augmented Generation works, step by step</p>
 
-    <div class="input-area">
-        <input type="text" id="queryInput" placeholder="Ask something about space, health, or tech..." value="What are the health benefits of regular exercise?">
-        <button onclick="startRAG()">▶ Run RAG Pipeline</button>
+<div class="wrapper">
+
+  <!-- ─── HEADER ─── -->
+  <header>
+    <div class="badge"><span class="badge-dot"></span> Interactive Simulator</div>
+    <h1>RAG — Step by Step</h1>
+    <p class="subtitle">Retrieval-Augmented Generation lets AI answer questions using your own documents. Walk through every stage of the pipeline — from documents to final answer.</p>
+  </header>
+
+  <!-- ─── PIPELINE NAV ─── -->
+  <div class="pipeline" id="pipelineNav">
+    <div class="pipe-step">
+      <button class="pipe-btn active" onclick="goTo(0)" id="pnav-0">
+        <span class="pipe-num">1</span> Documents
+      </button>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <button class="pipe-btn" onclick="goTo(1)" id="pnav-1">
+        <span class="pipe-num">2</span> Chunking
+      </button>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <button class="pipe-btn" onclick="goTo(2)" id="pnav-2">
+        <span class="pipe-num">3</span> Embeddings
+      </button>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <button class="pipe-btn" onclick="goTo(3)" id="pnav-3">
+        <span class="pipe-num">4</span> Query
+      </button>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <button class="pipe-btn" onclick="goTo(4)" id="pnav-4">
+        <span class="pipe-num">5</span> Retrieval
+      </button>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <button class="pipe-btn" onclick="goTo(5)" id="pnav-5">
+        <span class="pipe-num">6</span> Augmentation
+      </button>
+    </div>
+    <div class="pipe-arrow">›</div>
+    <div class="pipe-step">
+      <button class="pipe-btn" onclick="goTo(6)" id="pnav-6">
+        <span class="pipe-num">7</span> Generation
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── STAGE 0: Documents ─── -->
+  <div class="stage active" id="stage-0">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(79,142,247,0.1);border-color:rgba(79,142,247,0.3)">📚</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 1 of 7</div>
+        <div class="stage-title">The Knowledge Base</div>
+        <div class="stage-desc">RAG starts with your own documents — PDFs, articles, notes, manuals. These become the AI's private memory. Select 2–3 documents below to load into the pipeline.</div>
+      </div>
     </div>
 
-    <div class="controls">
-        <button id="btnStep" onclick="nextStep()" disabled>Next Step →</button>
-        <button class="secondary" onclick="resetSim()">↺ Reset</button>
-        <button class="secondary" onclick="toggleAuto()" id="btnAuto">Auto Play</button>
+    <div class="panel">
+      <div class="panel-title">Available Documents</div>
+      <div class="doc-grid" id="docGrid">
+        <div class="doc-card" onclick="toggleDoc(0)" id="doc-0">
+          <div class="doc-check">✓</div>
+          <div class="doc-card-icon">📊</div>
+          <div class="doc-card-title">Q3 2024 Fintech Report</div>
+          <div class="doc-card-snippet">Nigeria's digital payments grew 47% YoY. Mobile money accounts surpassed 18M. NIBSS processed ₦8.2T in transactions...</div>
+        </div>
+        <div class="doc-card" onclick="toggleDoc(1)" id="doc-1">
+          <div class="doc-check">✓</div>
+          <div class="doc-card-icon">🏦</div>
+          <div class="doc-card-title">Central Bank Policy Brief</div>
+          <div class="doc-card-snippet">The CBN's Open Banking framework mandates API-first architecture for tier-1 banks by Q2 2025. Fintechs must comply with GDPR-equivalent data rules...</div>
+        </div>
+        <div class="doc-card" onclick="toggleDoc(2)" id="doc-2">
+          <div class="doc-check">✓</div>
+          <div class="doc-card-icon">🤖</div>
+          <div class="doc-card-title">AI Governance Primer</div>
+          <div class="doc-card-snippet">Responsible AI deployment requires transparency, fairness audits, and human-in-the-loop oversight. The EU AI Act classifies financial AI as high-risk...</div>
+        </div>
+        <div class="doc-card" onclick="toggleDoc(3)" id="doc-3">
+          <div class="doc-check">✓</div>
+          <div class="doc-card-icon">💳</div>
+          <div class="doc-card-title">Payment Infrastructure Guide</div>
+          <div class="doc-card-snippet">Interswitch's switching engine handles 2M+ transactions per day. POS terminal density is 30 per 100K adults — far below the 300+ benchmark for developed markets...</div>
+        </div>
+      </div>
     </div>
 
-    <div class="pipeline">
-        <!-- Stage 1: Knowledge Base -->
-        <div class="stage" id="stage1">
-            <div class="stage-header">
-                <div class="stage-num">1</div>
-                <div class="stage-title">Knowledge Base (Documents)</div>
-            </div>
-            <div class="stage-desc">Raw documents that the system can retrieve information from.</div>
-            <div class="visual-box">
-                <div class="knowledge-base" id="kbDisplay"></div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow1">⬇</div>
-
-        <!-- Stage 2: Chunking -->
-        <div class="stage" id="stage2">
-            <div class="stage-header">
-                <div class="stage-num">2</div>
-                <div class="stage-title">Document Chunking</div>
-            </div>
-            <div class="stage-desc">Documents are split into smaller, manageable chunks for better retrieval.</div>
-            <div class="visual-box">
-                <div class="chunk-grid" id="chunkDisplay"></div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow2">⬇</div>
-
-        <!-- Stage 3: Embedding -->
-        <div class="stage" id="stage3">
-            <div class="stage-header">
-                <div class="stage-num">3</div>
-                <div class="stage-title">Vector Embedding</div>
-            </div>
-            <div class="stage-desc">Chunks are converted into high-dimensional vectors using an embedding model.</div>
-            <div class="visual-box">
-                <div class="vector-demo" id="vectorDisplay"></div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow3">⬇</div>
-
-        <!-- Stage 4: Query Embedding -->
-        <div class="stage" id="stage4">
-            <div class="stage-header">
-                <div class="stage-num">4</div>
-                <div class="stage-title">Query Embedding</div>
-            </div>
-            <div class="stage-desc">Your question is also converted into a vector in the same embedding space.</div>
-            <div class="visual-box">
-                <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-                    <div style="font-size:1.1rem; max-width:300px;" id="queryText"></div>
-                    <div style="font-size:1.5rem; color:var(--accent);">→</div>
-                    <div class="vector-bar" id="queryVector"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow4">⬇</div>
-
-        <!-- Stage 5: Similarity Search -->
-        <div class="stage" id="stage5">
-            <div class="stage-header">
-                <div class="stage-num">5</div>
-                <div class="stage-title">Similarity Search</div>
-            </div>
-            <div class="stage-desc">The system finds chunks whose vectors are most similar to the query vector.</div>
-            <div class="visual-box">
-                <div class="similarity-matrix" id="similarityDisplay"></div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow5">⬇</div>
-
-        <!-- Stage 6: Retrieval -->
-        <div class="stage" id="stage6">
-            <div class="stage-header">
-                <div class="stage-num">6</div>
-                <div class="stage-title">Context Retrieval</div>
-            </div>
-            <div class="stage-desc">Top-k most relevant chunks are retrieved to provide context for the answer.</div>
-            <div class="visual-box">
-                <div class="retrieved-docs" id="retrievedDisplay"></div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow6">⬇</div>
-
-        <!-- Stage 7: Prompt Construction -->
-        <div class="stage" id="stage7">
-            <div class="stage-header">
-                <div class="stage-num">7</div>
-                <div class="stage-title">Prompt Construction</div>
-            </div>
-            <div class="stage-desc">Retrieved context is injected into a prompt template along with the original question.</div>
-            <div class="visual-box">
-                <div class="prompt-box" id="promptDisplay"></div>
-            </div>
-        </div>
-
-        <div class="arrow" id="arrow7">⬇</div>
-
-        <!-- Stage 8: Generation -->
-        <div class="stage" id="stage8">
-            <div class="stage-header">
-                <div class="stage-num">8</div>
-                <div class="stage-title">LLM Generation</div>
-            </div>
-            <div class="stage-desc">The LLM uses the augmented prompt to generate a grounded, accurate answer.</div>
-            <div class="answer-box" id="answerDisplay">
-                <span class="typing-cursor"></span>
-            </div>
-        </div>
+    <div class="callout">
+      💡 <strong>Why this matters:</strong> The model never sees these documents during training. RAG gives it fresh, private, accurate knowledge at inference time — without retraining.
     </div>
 
-    <div class="legend">
-        <div class="legend-item"><div class="dot waiting"></div> Waiting</div>
-        <div class="legend-item"><div class="dot active"></div> Active</div>
-        <div class="legend-item"><div class="dot done"></div> Complete</div>
+    <div class="nav-row">
+      <span class="step-indicator" id="docCount">0 documents selected</span>
+      <button class="btn btn-primary" onclick="proceedToChunking()">Chunk Documents →</button>
+    </div>
+  </div>
+
+  <!-- ─── STAGE 1: Chunking ─── -->
+  <div class="stage" id="stage-1">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(251,191,36,0.1);border-color:rgba(251,191,36,0.3)">✂️</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 2 of 7</div>
+        <div class="stage-title">Chunking</div>
+        <div class="stage-desc">Documents are too large to embed at once. They're split into smaller overlapping chunks — each chunk gets its own embedding vector. Smaller = more precise retrieval.</div>
+      </div>
     </div>
 
-    <script>
-        // ─── Knowledge Base ───
-        const knowledgeBase = [
-            { title: "Exercise & Health", content: "Regular physical activity strengthens the heart, improves circulation, and reduces risk of cardiovascular disease. Adults should aim for 150 minutes of moderate exercise per week." },
-            { title: "Mental Wellness", content: "Exercise releases endorphins and serotonin which improve mood and reduce symptoms of anxiety and depression. Even 30 minutes of walking can boost mental health." },
-            { title: "Sleep Science", content: "Quality sleep is essential for memory consolidation and immune function. Adults need 7-9 hours per night. Poor sleep is linked to obesity and diabetes." },
-            { title: "Nutrition Basics", content: "A balanced diet includes proteins, carbohydrates, healthy fats, vitamins, and minerals. Whole foods are preferable to processed foods for long-term health." },
-            { title: "Space Exploration", content: "NASA's Artemis program aims to return humans to the Moon by the mid-2020s. Mars remains the long-term goal for human colonization efforts." },
-            { title: "AI Technology", content: "Large Language Models use transformer architectures with attention mechanisms. They are trained on vast text corpora and can generate human-like text." }
-        ];
+    <div class="panel">
+      <div class="panel-title">Chunk Settings</div>
+      <div class="flex mb16">
+        <div style="flex:1">
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px">Chunk Size (tokens)</label>
+          <input type="range" min="50" max="300" value="150" id="chunkSize" oninput="updateChunkPreview()" style="width:100%">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Size: <span id="chunkSizeVal" style="color:var(--amber)">150</span> tokens</div>
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px">Overlap (tokens)</label>
+          <input type="range" min="0" max="80" value="20" id="chunkOverlap" oninput="updateChunkPreview()" style="width:100%">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Overlap: <span id="chunkOverlapVal" style="color:var(--amber)">20</span> tokens</div>
+        </div>
+      </div>
+      <button class="btn btn-sm" onclick="generateChunks()">⚡ Generate Chunks</button>
+    </div>
 
-        let currentStep = 0;
-        let autoPlay = false;
-        let autoTimer = null;
-        let userQuery = "";
-        let relevantChunks = [];
+    <div class="panel" id="chunksPanel" style="display:none">
+      <div class="panel-title">Generated Chunks — <span id="chunkCount">0</span> total</div>
+      <div class="chunks-grid" id="chunksGrid"></div>
+    </div>
 
-        const stages = 8;
+    <div class="callout callout-amber">
+      ✂️ <strong>Overlap trick:</strong> Chunks overlap by <span id="overlapNote">20</span> tokens so that sentences spanning chunk boundaries are captured in both — preventing context loss.
+    </div>
 
-        function resetSim() {
-            currentStep = 0;
-            autoPlay = false;
-            clearInterval(autoTimer);
-            document.getElementById('btnAuto').textContent = "Auto Play";
-            document.getElementById('btnStep').disabled = false;
+    <div class="nav-row">
+      <button class="btn" onclick="goTo(0)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(2)" id="toEmbedBtn" disabled>Embed Chunks →</button>
+    </div>
+  </div>
 
-            for (let i = 1; i <= stages; i++) {
-                document.getElementById('stage' + i).className = 'stage';
-                document.getElementById('arrow' + i).className = 'arrow';
-            }
-            document.getElementById('kbDisplay').innerHTML = '';
-            document.getElementById('chunkDisplay').innerHTML = '';
-            document.getElementById('vectorDisplay').innerHTML = '';
-            document.getElementById('queryText').innerHTML = '';
-            document.getElementById('queryVector').innerHTML = '';
-            document.getElementById('similarityDisplay').innerHTML = '';
-            document.getElementById('retrievedDisplay').innerHTML = '';
-            document.getElementById('promptDisplay').innerHTML = '';
-            document.getElementById('answerDisplay').innerHTML = '<span class="typing-cursor"></span>';
-        }
+  <!-- ─── STAGE 2: Embeddings ─── -->
+  <div class="stage" id="stage-2">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(167,139,250,0.1);border-color:rgba(167,139,250,0.3)">🔢</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 3 of 7</div>
+        <div class="stage-title">Embedding</div>
+        <div class="stage-desc">Each chunk is converted to a vector — a list of numbers that captures its semantic meaning. Similar meanings cluster together in vector space, enabling semantic search.</div>
+      </div>
+    </div>
 
-        function startRAG() {
-            resetSim();
-            userQuery = document.getElementById('queryInput').value.trim() || "What are the health benefits of regular exercise?";
-            nextStep();
-        }
+    <div class="panel">
+      <div class="panel-title">Embedding Model</div>
+      <div class="flex mb16" style="flex-wrap:wrap;gap:8px">
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;flex:1;min-width:180px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Model</div>
+          <div style="font-size:12px;color:var(--purple)">text-embedding-3-large</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;flex:1;min-width:140px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Dimensions</div>
+          <div style="font-size:12px;color:var(--purple)">3,072</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;flex:1;min-width:140px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Similarity</div>
+          <div style="font-size:12px;color:var(--purple)">Cosine</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="runEmbedding()">▶ Run Embedding Pipeline</button>
+    </div>
 
-        function toggleAuto() {
-            autoPlay = !autoPlay;
-            document.getElementById('btnAuto').textContent = autoPlay ? "⏸ Pause" : "Auto Play";
-            if (autoPlay && currentStep < stages) {
-                autoTimer = setInterval(() => {
-                    if (currentStep >= stages) {
-                        autoPlay = false;
-                        clearInterval(autoTimer);
-                        document.getElementById('btnAuto').textContent = "Auto Play";
-                        return;
-                    }
-                    nextStep();
-                }, 1800);
-            } else {
-                clearInterval(autoTimer);
-            }
-        }
+    <div id="embeddingResults" style="display:none">
+      <div class="panel">
+        <div class="panel-title">Vector Representations</div>
+        <div id="embeddingRows"></div>
+      </div>
 
-        function nextStep() {
-            currentStep++;
-            if (currentStep > stages) return;
+      <div class="panel">
+        <div class="panel-title">2D Vector Space Projection (t-SNE)</div>
+        <canvas class="vector-canvas" id="vectorCanvas"></canvas>
+        <div style="font-size:10px;color:var(--text3);margin-top:8px">Each dot = one chunk. Proximity = semantic similarity. Hover to see chunk text.</div>
+      </div>
+    </div>
 
-            // Mark previous as done
-            if (currentStep > 1) {
-                document.getElementById('stage' + (currentStep - 1)).className = 'stage done';
-                document.getElementById('arrow' + (currentStep - 1)).className = 'arrow show';
-            }
+    <div class="callout" style="margin-top:16px">
+      🔢 <strong>What's a vector?</strong> Think of it as coordinates in meaning-space. "AI governance" and "responsible AI" end up near each other. "Payment terminals" ends up far away — in a different cluster.
+    </div>
 
-            // Activate current
-            const stageEl = document.getElementById('stage' + currentStep);
-            stageEl.className = 'stage active';
-            stageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    <div class="nav-row">
+      <button class="btn" onclick="goTo(1)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(3)">Enter Query →</button>
+    </div>
+  </div>
 
-            executeStep(currentStep);
+  <!-- ─── STAGE 3: Query ─── -->
+  <div class="stage" id="stage-3">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(34,211,238,0.1);border-color:rgba(34,211,238,0.3)">🔍</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 4 of 7</div>
+        <div class="stage-title">User Query</div>
+        <div class="stage-desc">The user's question is also embedded into a vector using the same model. We then find the chunks whose vectors are closest — that's retrieval.</div>
+      </div>
+    </div>
 
-            if (currentStep === stages) {
-                document.getElementById('btnStep').disabled = true;
-                clearInterval(autoTimer);
-                autoPlay = false;
-                document.getElementById('btnAuto').textContent = "Auto Play";
-            }
-        }
+    <div class="panel">
+      <div class="panel-title">Enter Your Question</div>
+      <div class="flex mb16" style="flex-wrap:wrap;gap:6px">
+        <button class="btn btn-sm" onclick="setQuery('What is the state of mobile payments in Nigeria?')">Try: Mobile payments</button>
+        <button class="btn btn-sm" onclick="setQuery('What are the AI governance requirements for financial services?')">Try: AI governance</button>
+        <button class="btn btn-sm" onclick="setQuery('How many POS terminals are deployed in Nigeria?')">Try: POS terminals</button>
+      </div>
+      <textarea id="queryInput" rows="3" placeholder="Type your question here...">What is the state of mobile payments in Nigeria?</textarea>
+      <div class="mt8">
+        <button class="btn btn-primary" onclick="embedQuery()">⚡ Embed Query Vector</button>
+      </div>
+    </div>
 
-        function executeStep(step) {
-            switch(step) {
-                case 1: renderKnowledgeBase(); break;
-                case 2: renderChunks(); break;
-                case 3: renderEmbeddings(); break;
-                case 4: renderQueryEmbedding(); break;
-                case 5: renderSimilarity(); break;
-                case 6: renderRetrieved(); break;
-                case 7: renderPrompt(); break;
-                case 8: renderAnswer(); break;
-            }
-        }
+    <div id="queryEmbedResult" style="display:none">
+      <div class="panel">
+        <div class="panel-title">Query Vector Preview</div>
+        <div style="font-size:12px;color:var(--teal);font-style:italic;margin-bottom:10px" id="queryText2"></div>
+        <div class="embed-bar-wrap" style="height:10px;background:var(--bg2);border-radius:5px;overflow:hidden">
+          <div id="queryEmbedBar" style="height:100%;border-radius:5px;background:linear-gradient(90deg,var(--teal),var(--accent));width:0;transition:width 1s cubic-bezier(0.4,0,0.2,1)"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:8px" id="queryVecPreview"></div>
+        <div style="font-size:11px;color:var(--text2);margin-top:12px">
+          This vector will be compared against all <strong id="numChunksInDB">0</strong> chunk vectors in the database using cosine similarity.
+        </div>
+      </div>
+    </div>
 
-        // ─── Step 1: Knowledge Base ───
-        function renderKnowledgeBase() {
-            const container = document.getElementById('kbDisplay');
-            container.innerHTML = knowledgeBase.map((doc, i) => `
-                <div class="kb-doc" id="kb-${i}">
-                    <div class="kb-title">📄 ${doc.title}</div>
-                    <div class="kb-content">${doc.content}</div>
-                </div>
-            `).join('');
+    <div class="callout" style="margin-top:16px">
+      🔍 <strong>Key insight:</strong> The query and documents live in the same vector space. Proximity = relevance. No keyword matching needed.
+    </div>
 
-            // Highlight relevant docs based on query keywords
-            const q = userQuery.toLowerCase();
-            knowledgeBase.forEach((doc, i) => {
-                const text = (doc.title + ' ' + doc.content).toLowerCase();
-                const score = keywordMatchScore(q, text);
-                if (score > 0) {
-                    setTimeout(() => {
-                        document.getElementById('kb-' + i).classList.add('active');
-                    }, i * 200);
-                }
-            });
-        }
+    <div class="nav-row">
+      <button class="btn" onclick="goTo(2)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(4)">Retrieve →</button>
+    </div>
+  </div>
 
-        // ─── Step 2: Chunking ───
-        function renderChunks() {
-            const container = document.getElementById('chunkDisplay');
-            let allChunks = [];
-            knowledgeBase.forEach((doc, di) => {
-                const sentences = doc.content.match(/[^.!?]+[.!?]+/g) || [doc.content];
-                sentences.forEach((sent, si) => {
-                    allChunks.push({ text: sent.trim(), docIdx: di, chunkIdx: si, docTitle: doc.title });
-                });
-            });
+  <!-- ─── STAGE 4: Retrieval ─── -->
+  <div class="stage" id="stage-4">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.3)">🎯</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 5 of 7</div>
+        <div class="stage-title">Vector Retrieval</div>
+        <div class="stage-desc">The query vector is compared against every chunk vector. Top-K most similar chunks are selected. These are the passages the LLM will use to answer your question.</div>
+      </div>
+    </div>
 
-            container.innerHTML = allChunks.map((chunk, i) => `
-                <div class="chunk" id="chunk-${i}" title="From: ${chunk.docTitle}">
-                    <div style="font-weight:600; margin-bottom:4px; font-size:0.7rem; color:var(--accent);">${chunk.docTitle}</div>
-                    ${chunk.text.substring(0, 60)}${chunk.text.length > 60 ? '...' : ''}
-                </div>
-            `).join('');
+    <div class="panel">
+      <div class="panel-title">Retrieval Settings</div>
+      <div class="flex mb16">
+        <div style="flex:1">
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px">Top K Results</label>
+          <input type="range" min="1" max="5" value="3" id="topK" oninput="document.getElementById('topKVal').textContent=this.value;runRetrieval()">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">K = <span id="topKVal" style="color:var(--green)">3</span></div>
+        </div>
+        <div style="flex:1">
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px">Min Score Threshold</label>
+          <input type="range" min="0" max="95" value="30" id="threshold" oninput="document.getElementById('thresholdVal').textContent=this.value+'%';runRetrieval()">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Min: <span id="thresholdVal" style="color:var(--green)">30%</span></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="runRetrieval()">🎯 Run Similarity Search</button>
+    </div>
 
-            // Determine relevance
-            const q = userQuery.toLowerCase();
-            relevantChunks = allChunks.map((chunk, i) => {
-                const score = keywordMatchScore(q, (chunk.docTitle + ' ' + chunk.text).toLowerCase());
-                return { ...chunk, idx: i, score };
-            }).sort((a, b) => b.score - a.score);
+    <div class="panel" id="retrievalPanel" style="display:none">
+      <div class="panel-title">Ranked Results — <span id="retrievedCount">0</span> retrieved</div>
+      <div class="retrieval-grid" id="retrievalGrid"></div>
+    </div>
 
-            // Highlight top chunks
-            const topIndices = relevantChunks.slice(0, 4).map(c => c.idx);
-            setTimeout(() => {
-                topIndices.forEach((idx, i) => {
-                    setTimeout(() => {
-                        document.getElementById('chunk-' + idx).classList.add('highlight');
-                    }, i * 250);
-                });
-            }, 400);
-        }
+    <div class="callout callout-green" style="margin-top:16px">
+      ✅ <strong>ANN Search:</strong> Real systems use Approximate Nearest Neighbour (FAISS, Pinecone, Weaviate) to search millions of vectors in milliseconds.
+    </div>
 
-        // ─── Step 3: Vector Embeddings ───
-        function renderEmbeddings() {
-            const container = document.getElementById('vectorDisplay');
-            // Show a few representative vectors
-            const sampleChunks = relevantChunks.slice(0, 4);
+    <div class="nav-row">
+      <button class="btn" onclick="goTo(3)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(5)">Build Prompt →</button>
+    </div>
+  </div>
 
-            container.innerHTML = sampleChunks.map((chunk, i) => {
-                const bars = generateVectorBars(16, chunk.score);
-                return `
-                    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
-                        <div style="width:120px; font-size:0.75rem; color:var(--text-dim); text-align:right;">${chunk.docTitle} #${chunk.chunkIdx + 1}</div>
-                        <div class="vector-bar">${bars}</div>
-                    </div>
-                `;
-            }).join('');
-        }
+  <!-- ─── STAGE 5: Augmentation ─── -->
+  <div class="stage" id="stage-5">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.3)">📝</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 6 of 7</div>
+        <div class="stage-title">Prompt Augmentation</div>
+        <div class="stage-desc">Retrieved chunks are injected into the LLM's prompt alongside the user's question. This is the "A" in RAG — the model is now grounded in real document context.</div>
+      </div>
+    </div>
 
-        function generateVectorBars(count, relevance) {
-            let html = '';
-            for (let i = 0; i < count; i++) {
-                const h = Math.floor(Math.random() * 40 + 10 + (relevance * 15));
-                html += `<div class="v-col" style="height:${h}px"></div>`;
-            }
-            return html;
-        }
+    <div class="panel" id="augmentPanel">
+      <div class="panel-title">Augmented Prompt</div>
 
-        // ─── Step 4: Query Embedding ───
-        function renderQueryEmbedding() {
-            document.getElementById('queryText').textContent = `"${userQuery}"`;
-            const bars = generateVectorBars(16, 1.0).replace(/v-col/g, 'v-col query');
-            document.getElementById('queryVector').innerHTML = bars;
-        }
+      <div class="prompt-block system">
+        <div class="prompt-block-label">System</div>
+        You are a helpful AI assistant. Answer the user's question using ONLY the context provided. If the answer is not in the context, say "I don't have enough information." Be concise and cite the source.
+      </div>
 
-        // ─── Step 5: Similarity Search ───
-        function renderSimilarity() {
-            const container = document.getElementById('similarityDisplay');
-            const topChunks = relevantChunks.slice(0, 5);
+      <div class="prompt-block context">
+        <div class="prompt-block-label">Retrieved Context</div>
+        <div id="augmentedContext">Loading context...</div>
+      </div>
 
-            container.innerHTML = topChunks.map((chunk, i) => {
-                const pct = Math.min(95, Math.round((chunk.score / (relevantChunks[0].score || 1)) * 100));
-                return `
-                    <div class="sim-row">
-                        <div class="sim-label">${chunk.docTitle}</div>
-                        <div class="sim-bar-bg">
-                            <div class="sim-bar" style="width:0%" id="sim-bar-${i}">${pct}%</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+      <div class="prompt-block query">
+        <div class="prompt-block-label">User Query</div>
+        <span id="augmentedQuery" class="highlight">...</span>
+      </div>
+    </div>
 
-            setTimeout(() => {
-                topChunks.forEach((_, i) => {
-                    const bar = document.getElementById('sim-bar-' + i);
-                    if (bar) bar.style.width = bar.textContent;
-                });
-            }, 300);
-        }
+    <div class="panel">
+      <div class="panel-title">Token Budget</div>
+      <div id="tokenBudget" style="font-size:12px;color:var(--text2);margin-bottom:8px"></div>
+      <div class="token-pills" id="tokenPills"></div>
+    </div>
 
-        // ─── Step 6: Retrieved Context ───
-        function renderRetrieved() {
-            const container = document.getElementById('retrievedDisplay');
-            const top3 = relevantChunks.slice(0, 3);
+    <div class="callout">
+      📝 <strong>Context window:</strong> The retrieved chunks must fit within the LLM's context window (e.g. 128K tokens for GPT-4o). This is why chunk size and top-K matter.
+    </div>
 
-            container.innerHTML = top3.map((chunk, i) => `
-                <div class="doc-item" style="animation: fadeIn 0.5s ${i * 0.2}s both;">
-                    <span>📄 <b>${chunk.docTitle}</b> — ${chunk.text.substring(0, 90)}...</span>
-                    <span class="score">Score: ${(chunk.score * 100).toFixed(1)}</span>
-                </div>
-            `).join('');
-        }
+    <div class="nav-row">
+      <button class="btn" onclick="goTo(4)">← Back</button>
+      <button class="btn btn-primary" onclick="goTo(6)">Generate Answer →</button>
+    </div>
+  </div>
 
-        // ─── Step 7: Prompt Construction ───
-        function renderPrompt() {
-            const top3 = relevantChunks.slice(0, 3);
-            const context = top3.map((c, i) => `[${i + 1}] ${c.text}`).join('
+  <!-- ─── STAGE 6: Generation ─── -->
+  <div class="stage" id="stage-6">
+    <div class="stage-header">
+      <div class="stage-icon" style="background:rgba(167,139,250,0.1);border-color:rgba(167,139,250,0.3)">✨</div>
+      <div class="stage-meta">
+        <div class="stage-label">Step 7 of 7</div>
+        <div class="stage-title">LLM Generation</div>
+        <div class="stage-desc">The LLM reads your question + retrieved context and generates a grounded, accurate answer — citing only what's in your documents, not its training data.</div>
+      </div>
+    </div>
 
-');
+    <div class="panel">
+      <div class="panel-title">Model Settings</div>
+      <div class="flex mb16" style="flex-wrap:wrap;gap:8px">
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;flex:1;min-width:160px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">LLM</div>
+          <div style="font-size:12px;color:var(--purple)">GPT-4o / Claude 3.5</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;flex:1;min-width:140px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Temperature</div>
+          <input type="range" min="0" max="10" value="3" id="tempSlider" oninput="document.getElementById('tempVal').textContent=(this.value/10).toFixed(1)" style="width:100%;margin-top:4px">
+          <div style="font-size:11px;color:var(--purple);margin-top:2px"><span id="tempVal">0.3</span></div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;flex:1;min-width:140px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Max Tokens</div>
+          <div style="font-size:12px;color:var(--purple)">512</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="genBtn" onclick="generateResponse()">✨ Generate Answer</button>
+    </div>
 
-            const promptHTML = `
-                <span class="prompt-label">SYSTEM</span>
-                You are a helpful assistant. Use the provided context to answer the user's question accurately. If the context doesn't contain the answer, say you don't know.<br><br>
+    <div class="llm-response" id="responseBox" style="display:none">
+      <div class="llm-header">
+        <div class="llm-avatar">🤖</div>
+        <div>
+          <div class="llm-name">RAG-Grounded Response</div>
+          <div class="llm-model">Based on your selected documents</div>
+        </div>
+        <div style="margin-left:auto;font-size:10px;color:var(--green);background:var(--green-dim);border:1px solid rgba(52,211,153,0.3);border-radius:100px;padding:4px 10px">● Grounded</div>
+      </div>
+      <div class="response-text" id="responseText"></div>
+    </div>
 
-                <span class="prompt-label">CONTEXT</span>
-                <div class="context-block">${context.replace(/
-/g, '<br>')}</div>
+    <div style="display:none" id="successBlock">
+      <div class="callout callout-green mt16">
+        🎉 <strong>Pipeline complete!</strong> This response is grounded — it can only say what's in your documents. No hallucination from training data. This is the power of RAG.
+      </div>
 
-                <span class="prompt-label">USER QUESTION</span>
-                ${userQuery}<br><br>
+      <div class="overview-grid mt16" id="summaryGrid">
+        <div class="overview-card done"><div class="overview-num" id="sum-docs">0</div><div class="overview-label">Documents</div></div>
+        <div class="overview-card done"><div class="overview-num" id="sum-chunks">0</div><div class="overview-label">Chunks</div></div>
+        <div class="overview-card done"><div class="overview-num" id="sum-retrieved">0</div><div class="overview-label">Retrieved</div></div>
+        <div class="overview-card done"><div class="overview-num" id="sum-tokens">~320</div><div class="overview-label">Prompt tokens</div></div>
+      </div>
 
-                <span class="prompt-label">INSTRUCTION</span>
-                Based on the context above, provide a clear and concise answer to the question.
-            `;
+      <div class="nav-row">
+        <button class="btn btn-primary" onclick="resetAll()">↺ Start Over</button>
+      </div>
+    </div>
 
-            document.getElementById('promptDisplay').innerHTML = promptHTML;
-        }
+    <div class="nav-row">
+      <button class="btn" onclick="goTo(5)">← Back</button>
+    </div>
+  </div>
 
-        // ─── Step 8: Generate Answer ───
-        function renderAnswer() {
-            const answerBox = document.getElementById('answerDisplay');
-            const topChunks = relevantChunks.slice(0, 3);
+</div>
 
-            // Generate a simple answer based on retrieved chunks
-            let answer = generateAnswer(userQuery, topChunks);
+<script>
+const DOCS = [
+  {
+    id: 0, title: "Q3 2024 Fintech Report",
+    content: `Nigeria's digital payments ecosystem grew 47% year-over-year in Q3 2024. Mobile money accounts surpassed 18 million active users across all platforms. NIBSS (Nigeria Inter-Bank Settlement System) processed over ₦8.2 trillion in transactions during the quarter. The adoption rate of POS terminals increased by 23%, though penetration remains at 30 devices per 100,000 adults. Instant payment volumes via NIP (NIBSS Instant Payment) averaged 12 million transactions daily. Fintechs like OPay, PalmPay, and Moniepoint captured 34% of agent banking transactions.`
+  },
+  {
+    id: 1, title: "Central Bank Policy Brief",
+    content: `The CBN's Open Banking regulatory framework mandates API-first architecture for all tier-1 and tier-2 banks by Q2 2025. Fintechs operating in the payment space must comply with GDPR-equivalent data protection rules under the Nigeria Data Protection Act 2023. The framework introduces three data-sharing tiers: public, shared, and private. Third-party providers must obtain explicit customer consent before accessing any financial data. Non-compliant institutions face fines of up to ₦10 million or license revocation. The framework is expected to unlock $3.4 billion in new financial services revenue by 2027.`
+  },
+  {
+    id: 2, title: "AI Governance Primer",
+    content: `Responsible AI deployment in financial services requires three pillars: transparency, fairness, and accountability. Algorithmic systems must produce explainable outputs, especially when used for credit scoring or fraud detection. The EU AI Act classifies financial AI systems as high-risk, requiring conformity assessments and continuous monitoring. Human-in-the-loop oversight is mandatory for automated decisions affecting consumer rights. Bias audits must be conducted quarterly using disaggregated demographic data. Governance boards should include technical, legal, and ethics representatives. Model drift monitoring should trigger alerts when performance degrades beyond 5% baseline deviation.`
+  },
+  {
+    id: 3, title: "Payment Infrastructure Guide",
+    content: `Interswitch's switching engine processes over 2 million transactions per day with 99.97% uptime. POS terminal density in Nigeria stands at 30 per 100,000 adults — significantly below the 300+ benchmark seen in developed markets like South Africa and Kenya. The National Domestic Card Scheme (Afrigo) aims to reduce dependency on Visa and Mastercard for domestic transactions. ATM density is 16.6 per 100,000 adults. USSD banking remains the most accessible channel for unbanked populations, processing ₦3.9 trillion annually. Last-mile payment infrastructure in rural areas is primarily served by agent banking networks with over 2.1 million registered agents nationwide.`
+  }
+];
 
-            answerBox.innerHTML = '';
-            let i = 0;
-            const typeInterval = setInterval(() => {
-                if (i < answer.length) {
-                    answerBox.innerHTML += answer.charAt(i);
-                    i++;
-                } else {
-                    clearInterval(typeInterval);
-                    answerBox.innerHTML += '<span class="typing-cursor"></span>';
-                }
-            }, 25);
-        }
+const CHUNK_TEXTS = [
+  "Nigeria's digital payments grew 47% YoY. Mobile money accounts surpassed 18M active users. NIBSS processed ₦8.2T in transactions. NIP averaged 12M daily transactions.",
+  "POS adoption increased 23% but penetration is only 30 per 100K adults. Fintechs like OPay, PalmPay, and Moniepoint captured 34% of agent banking transactions.",
+  "The CBN Open Banking framework mandates API-first architecture for tier-1 and tier-2 banks by Q2 2025. Fintechs must comply with NDPA 2023 data protection rules.",
+  "Open Banking introduces 3 data-sharing tiers. Third-party providers need explicit customer consent. Non-compliance risks fines of ₦10M or license revocation.",
+  "Responsible AI requires transparency, fairness, and accountability. The EU AI Act classifies financial AI as high-risk. Bias audits must be conducted quarterly.",
+  "Human-in-the-loop oversight is mandatory for automated decisions. Model drift monitoring triggers alerts when performance degrades beyond 5% from baseline.",
+  "Interswitch processes 2M+ transactions/day at 99.97% uptime. POS density is 30/100K adults vs 300+ in developed markets. Afrigo aims to reduce Visa/Mastercard dependency.",
+  "USSD banking processes ₦3.9T annually. 2.1M registered banking agents serve rural last-mile infrastructure. ATM density is 16.6 per 100K adults.",
+];
 
-        function generateAnswer(query, chunks) {
-            const q = query.toLowerCase();
+const CHUNK_SOURCES = [0,0,1,1,2,2,3,3];
 
-            if (q.includes('exercise') || q.includes('health benefit') || q.includes('workout')) {
-                return "Regular exercise offers numerous health benefits: it strengthens the cardiovascular system and improves circulation, reducing the risk of heart disease. It also releases endorphins and serotonin, which significantly improve mood and reduce anxiety and depression symptoms. Experts recommend at least 150 minutes of moderate exercise per week for adults, and even just 30 minutes of walking can provide mental health benefits.";
-            }
-            if (q.includes('sleep')) {
-                return "Quality sleep is crucial for overall health. Adults need 7-9 hours per night for optimal memory consolidation and immune function. Poor sleep quality has been linked to increased risks of obesity and diabetes. Maintaining a consistent sleep schedule and creating a restful environment can significantly improve sleep quality.";
-            }
-            if (q.includes('space') || q.includes('moon') || q.includes('mars') || q.includes('nasa')) {
-                return "NASA's Artemis program is working to return humans to the Moon by the mid-2020s, with the ultimate long-term goal of establishing a sustainable presence there. Mars remains the primary target for future human colonization efforts, representing the next major milestone in space exploration.";
-            }
-            if (q.includes('ai') || q.includes('llm') || q.includes('model') || q.includes('transformer')) {
-                return "Large Language Models (LLMs) are built on transformer architectures that use attention mechanisms to process text. They are trained on vast text corpora and can generate human-like text, answer questions, and assist with various tasks. RAG (Retrieval-Augmented Generation) enhances LLMs by grounding their responses in retrieved external documents.";
-            }
-            if (q.includes('nutrition') || q.includes('diet') || q.includes('food')) {
-                return "A balanced diet is fundamental to good health. It should include adequate proteins, carbohydrates, healthy fats, vitamins, and minerals. Whole foods — such as fruits, vegetables, whole grains, and lean proteins — are generally preferable to processed foods for maintaining long-term health and preventing chronic diseases.";
-            }
+const SIMILARITIES = {
+  "mobile payments": [0.91, 0.78, 0.31, 0.22, 0.19, 0.14, 0.72, 0.61],
+  "ai governance":   [0.21, 0.15, 0.29, 0.24, 0.93, 0.87, 0.18, 0.12],
+  "pos terminals":   [0.42, 0.71, 0.18, 0.14, 0.11, 0.09, 0.88, 0.79],
+  "default":         [0.68, 0.55, 0.44, 0.38, 0.31, 0.28, 0.52, 0.41],
+};
 
-            // Generic fallback
-            const contextSummary = chunks.map(c => c.text).join(' ');
-            return `Based on the retrieved context, here's what I found: ${contextSummary.substring(0, 200)}... This information suggests that the topic involves ${chunks[0]?.docTitle || 'the queried subject'}. For more specific details, you may want to consult additional sources on this topic.`;
-        }
+const RESPONSES = {
+  "mobile payments": `Based on the Q3 2024 Fintech Report, mobile payments in Nigeria are growing rapidly. Here's the current state:
 
-        // ─── Utility: Simple keyword matching for demo ───
-        function keywordMatchScore(query, text) {
-            const qWords = query.toLowerCase().split(/\W+/).filter(w => w.length > 2);
-            const tWords = text.toLowerCase().split(/\W+/);
-            let score = 0;
-            qWords.forEach(qw => {
-                const matches = tWords.filter(tw => tw.includes(qw) || qw.includes(tw)).length;
-                score += matches;
-            });
-            // Add title boost
-            if (text.includes(query.toLowerCase().split(' ')[0])) score += 2;
-            return score;
-        }
+**Growth:** Nigeria's digital payments ecosystem expanded **47% year-over-year** in Q3 2024.
 
-        // Add fade-in animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateX(-10px); }
-                to { opacity: 1; transform: translateX(0); }
-            }
-        `;
-        document.head.appendChild(style);
-    </script>
+**Scale:** Mobile money accounts have surpassed **18 million active users**, with NIBSS processing ₦8.2 trillion in transactions. The NIBSS Instant Payment (NIP) channel averages **12 million transactions daily**.
+
+**Gaps remain:** POS terminal density is only **30 per 100,000 adults** — far below the 300+ benchmark in comparable markets. However, agent banking is filling the gap, with fintechs like OPay, PalmPay, and Moniepoint handling 34% of those transactions.
+
+*Source: Q3 2024 Fintech Report — retrieved chunks [C0, C1, C6, C7]*`,
+
+  "ai governance": `According to the AI Governance Primer in the knowledge base, the key requirements for responsible AI in financial services are:
+
+**Three pillars:** Transparency, fairness, and accountability are non-negotiable for any AI system deployed in finance.
+
+**Regulatory framework:** The EU AI Act classifies financial AI as **high-risk**, requiring conformity assessments and ongoing monitoring. This includes credit scoring and fraud detection systems.
+
+**Operational requirements:**
+- Quarterly bias audits using disaggregated demographic data
+- Human-in-the-loop oversight for all automated consumer decisions  
+- Model drift alerts when performance drops >5% from baseline
+- Governance boards must include technical, legal, and ethics representatives
+
+*Source: AI Governance Primer — retrieved chunks [C4, C5]*`,
+
+  "pos terminals": `The Payment Infrastructure Guide provides the clearest picture of POS deployment in Nigeria:
+
+**Current density:** Nigeria has **30 POS terminals per 100,000 adults** — approximately 10× below the benchmark of 300+ seen in developed markets like South Africa and Kenya.
+
+**Uptime:** Interswitch's switching engine processes **2 million+ transactions per day** at 99.97% uptime, suggesting the switching infrastructure is robust even if terminal density is low.
+
+**Alternative channels:** USSD banking processes ₦3.9 trillion annually and serves as the primary access point for unbanked populations. The **2.1 million registered banking agents** are effectively compensating for low physical POS density.
+
+*Source: Payment Infrastructure Guide — retrieved chunks [C6, C7, C1]*`,
+
+  "default": `Based on the retrieved documents, here is what I found relevant to your question:
+
+The knowledge base contains information spanning Nigerian fintech growth metrics, CBN Open Banking policy, AI governance requirements, and payment infrastructure benchmarks.
+
+The most relevant context suggests Nigeria's financial services sector is at a critical inflection point — strong digital payment growth (47% YoY) is occurring alongside regulatory modernisation (Open Banking framework) and infrastructure gaps (30 POS terminals per 100K adults vs 300+ benchmark).
+
+For a more specific answer, try asking about: mobile payments, AI governance, POS terminals, or Open Banking policy.
+
+*Source: Multiple documents — top retrieved chunks shown above*`,
+};
+
+let selectedDocs = new Set();
+let chunks = [];
+let queryText = '';
+let retrievedChunks = [];
+let currentStage = 0;
+
+function toggleDoc(id) {
+  if (selectedDocs.has(id)) {
+    selectedDocs.delete(id);
+    document.getElementById('doc-'+id).classList.remove('selected');
+  } else {
+    selectedDocs.add(id);
+    document.getElementById('doc-'+id).classList.add('selected');
+  }
+  const n = selectedDocs.size;
+  document.getElementById('docCount').textContent = n + ' document' + (n !== 1 ? 's' : '') + ' selected';
+}
+
+function proceedToChunking() {
+  if (selectedDocs.size === 0) {
+    alert('Please select at least one document.');
+    return;
+  }
+  goTo(1);
+  generateChunks();
+}
+
+function updateChunkPreview() {
+  document.getElementById('chunkSizeVal').textContent = document.getElementById('chunkSize').value;
+  document.getElementById('chunkOverlapVal').textContent = document.getElementById('chunkOverlap').value;
+  document.getElementById('overlapNote').textContent = document.getElementById('chunkOverlap').value;
+}
+
+function generateChunks() {
+  chunks = [];
+  const selectedDocIds = [...selectedDocs];
+  selectedDocIds.forEach(docId => {
+    const doc = DOCS[docId];
+    const chunkIndices = [docId * 2, docId * 2 + 1];
+    chunkIndices.forEach(i => {
+      if (i < CHUNK_TEXTS.length) chunks.push({id: i, docId: docId, text: CHUNK_TEXTS[i]});
+    });
+  });
+
+  const grid = document.getElementById('chunksGrid');
+  grid.innerHTML = '';
+  chunks.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'chunk';
+    div.style.animationDelay = (i * 0.08) + 's';
+    div.innerHTML = `<span class="chunk-id">C${c.id}</span><span class="chunk-text">${c.text}</span>`;
+    grid.appendChild(div);
+  });
+
+  document.getElementById('chunkCount').textContent = chunks.length;
+  document.getElementById('chunksPanel').style.display = 'block';
+  document.getElementById('toEmbedBtn').disabled = false;
+  markDone(1);
+}
+
+let embeddingDone = false;
+
+function runEmbedding() {
+  document.getElementById('embeddingResults').style.display = 'block';
+  const rowsDiv = document.getElementById('embeddingRows');
+  rowsDiv.innerHTML = '';
+
+  chunks.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'embedding-row';
+    row.style.animationDelay = (i * 0.12) + 's';
+    const vecPreview = `[${(Math.random()*2-1).toFixed(3)}, ${(Math.random()*2-1).toFixed(3)}, ${(Math.random()*2-1).toFixed(3)} ... +3069 dims]`;
+    const barWidth = 40 + Math.random() * 55;
+    row.innerHTML = `
+      <span class="embed-label">C${c.id}: ${c.text.substring(0, 30)}…</span>
+      <div class="embed-bar-wrap"><div class="embed-bar" style="width:0" data-w="${barWidth}"></div></div>
+      <span class="embed-vec">${vecPreview}</span>
+    `;
+    rowsDiv.appendChild(row);
+    setTimeout(() => {
+      row.querySelector('.embed-bar').style.width = barWidth + '%';
+    }, 100 + i * 100);
+  });
+
+  setTimeout(() => drawVectorSpace(), 800);
+  embeddingDone = true;
+  markDone(2);
+}
+
+function drawVectorSpace() {
+  const canvas = document.getElementById('vectorCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * 2;
+  canvas.height = canvas.offsetHeight * 2;
+  ctx.scale(2, 2);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+
+  ctx.fillStyle = '#0d1320';
+  ctx.fillRect(0, 0, W, H);
+
+  const colors = ['#4f8ef7','#4f8ef7','#fbbf24','#fbbf24','#a78bfa','#a78bfa','#34d399','#34d399'];
+  const docNames = ['Fintech Report','Fintech Report','CBN Policy','CBN Policy','AI Governance','AI Governance','Payment Infra','Payment Infra'];
+
+  const positions = [
+    [0.15,0.35],[0.22,0.50],[0.55,0.22],[0.60,0.38],
+    [0.78,0.65],[0.72,0.78],[0.35,0.72],[0.42,0.60]
+  ];
+
+  chunks.forEach((c, i) => {
+    if (i < positions.length) {
+      const x = positions[i][0] * W;
+      const y = positions[i][1] * H;
+      const col = colors[c.id] || '#4f8ef7';
+
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = col + '33';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px monospace';
+      ctx.fillText('C' + c.id, x + 8, y + 4);
+    }
+  });
+
+  const docColors = {'Fintech Report':'#4f8ef7','CBN Policy':'#fbbf24','AI Governance':'#a78bfa','Payment Infra':'#34d399'};
+  let lx = 12, ly = 18;
+  Object.entries(docColors).forEach(([name, col]) => {
+    ctx.beginPath();
+    ctx.arc(lx + 5, ly - 4, 4, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.fillStyle = '#64748b';
+    ctx.font = '8px monospace';
+    ctx.fillText(name, lx + 14, ly);
+    ly += 16;
+  });
+}
+
+function setQuery(q) {
+  document.getElementById('queryInput').value = q;
+}
+
+function embedQuery() {
+  queryText = document.getElementById('queryInput').value.trim();
+  if (!queryText) { alert('Please enter a question.'); return; }
+
+  document.getElementById('queryEmbedResult').style.display = 'block';
+  document.getElementById('queryText2').textContent = '"' + queryText + '"';
+  document.getElementById('numChunksInDB').textContent = chunks.length;
+
+  const fake = `[${(Math.random()*2-1).toFixed(4)}, ${(Math.random()*2-1).toFixed(4)}, ${(Math.random()*2-1).toFixed(4)} ... +3069 dims]`;
+  document.getElementById('queryVecPreview').textContent = fake;
+
+  setTimeout(() => {
+    document.getElementById('queryEmbedBar').style.width = '78%';
+  }, 100);
+  markDone(3);
+}
+
+function getSimilarities() {
+  const q = queryText.toLowerCase();
+  if (q.includes('mobile') || q.includes('payment') || q.includes('mobile payment')) return SIMILARITIES['mobile payments'];
+  if (q.includes('ai') || q.includes('governance') || q.includes('responsible')) return SIMILARITIES['ai governance'];
+  if (q.includes('pos') || q.includes('terminal')) return SIMILARITIES['pos terminals'];
+  return SIMILARITIES['default'];
+}
+
+function runRetrieval() {
+  const k = parseInt(document.getElementById('topK').value);
+  const threshold = parseInt(document.getElementById('threshold').value) / 100;
+  const sims = getSimilarities();
+
+  const scored = chunks.map((c, i) => ({
+    ...c,
+    score: sims[c.id] || sims[i] || 0.3 + Math.random() * 0.3
+  })).sort((a, b) => b.score - a.score);
+
+  retrievedChunks = scored.filter(c => c.score >= threshold).slice(0, k);
+
+  document.getElementById('retrievalPanel').style.display = 'block';
+  document.getElementById('retrievedCount').textContent = retrievedChunks.length;
+
+  const grid = document.getElementById('retrievalGrid');
+  grid.innerHTML = '';
+
+  scored.slice(0, Math.min(scored.length, k + 2)).forEach((c, i) => {
+    const isMatch = retrievedChunks.some(r => r.id === c.id);
+    const pct = Math.round(c.score * 100);
+    let scoreClass = c.score >= 0.7 ? 'high' : c.score >= 0.4 ? 'med' : 'low';
+    let fillColor = c.score >= 0.7 ? 'var(--green)' : c.score >= 0.4 ? 'var(--amber)' : 'var(--coral)';
+
+    const div = document.createElement('div');
+    div.className = 'retrieval-item' + (isMatch ? ' match' : '');
+    div.style.animationDelay = (i * 0.1) + 's';
+    div.innerHTML = `
+      <div class="sim-score ${scoreClass}">${pct}%</div>
+      <div class="retrieval-content">
+        <div class="retrieval-text">${c.text}</div>
+        <div class="retrieval-meta">
+          <span>C${c.id}</span>
+          <span>${DOCS[c.docId] ? DOCS[c.docId].title : 'Unknown'}</span>
+          <span>${isMatch ? '✓ Selected' : '✗ Below threshold'}</span>
+        </div>
+        <div class="score-bar"><div class="score-fill" style="width:0;background:${fillColor}" data-w="${pct}%"></div></div>
+      </div>
+    `;
+    grid.appendChild(div);
+
+    setTimeout(() => {
+      div.querySelector('.score-fill').style.width = pct + '%';
+    }, 200 + i * 100);
+  });
+
+  markDone(4);
+}
+
+function buildAugmentation() {
+  const ctx = retrievedChunks.map((c, i) => `[${i+1}] ${c.text}`).join('\n\n');
+  document.getElementById('augmentedContext').innerHTML = ctx
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\[(\d+)\]/g, '<span class="highlight-green">[$1]</span>');
+
+  const q = queryText || document.getElementById('queryInput').value;
+  document.getElementById('augmentedQuery').textContent = q;
+
+  const sysTokens = 45;
+  const ctxTokens = Math.round(ctx.split(' ').length * 1.3);
+  const qTokens = Math.round(q.split(' ').length * 1.3);
+  const total = sysTokens + ctxTokens + qTokens;
+
+  document.getElementById('tokenBudget').innerHTML = `
+    <span style="color:var(--purple)">System:</span> ~${sysTokens} tokens  &nbsp;
+    <span style="color:var(--green)">Context:</span> ~${ctxTokens} tokens  &nbsp;
+    <span style="color:var(--accent2)">Query:</span> ~${qTokens} tokens  &nbsp;
+    <strong>Total: ~${total} / 128,000</strong>
+  `;
+
+  const pills = document.getElementById('tokenPills');
+  pills.innerHTML = '';
+  const words = ctx.split(' ').slice(0, 40);
+  words.forEach((w, i) => {
+    const span = document.createElement('span');
+    span.className = 'token';
+    span.textContent = w;
+    pills.appendChild(span);
+    setTimeout(() => span.classList.add('active'), i * 30);
+  });
+
+  markDone(5);
+}
+
+function generateResponse() {
+  document.getElementById('responseBox').style.display = 'block';
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('genBtn').textContent = '⌛ Generating...';
+
+  const q = (queryText || document.getElementById('queryInput').value || '').toLowerCase();
+  let responseKey = 'default';
+  if (q.includes('mobile') || q.includes('payment')) responseKey = 'mobile payments';
+  else if (q.includes('ai') || q.includes('governance')) responseKey = 'ai governance';
+  else if (q.includes('pos') || q.includes('terminal')) responseKey = 'pos terminals';
+
+  const fullText = RESPONSES[responseKey];
+  const el = document.getElementById('responseText');
+  el.innerHTML = '<span class="typing-cursor"></span>';
+
+  let i = 0;
+  const chars = fullText.split('');
+  const interval = setInterval(() => {
+    if (i < chars.length) {
+      el.innerHTML = fullText.substring(0, i+1).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>') + '<span class="typing-cursor"></span>';
+      i += 4;
+    } else {
+      el.innerHTML = fullText.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      clearInterval(interval);
+      document.getElementById('successBlock').style.display = 'block';
+      document.getElementById('sum-docs').textContent = selectedDocs.size;
+      document.getElementById('sum-chunks').textContent = chunks.length;
+      document.getElementById('sum-retrieved').textContent = retrievedChunks.length;
+      markDone(6);
+    }
+  }, 30);
+}
+
+function goTo(stage) {
+  document.querySelectorAll('.stage').forEach((s, i) => {
+    s.classList.toggle('active', i === stage);
+  });
+  document.querySelectorAll('[id^="pnav-"]').forEach((b, i) => {
+    b.classList.remove('active');
+    if (i < stage) b.classList.add('done');
+    if (i === stage) b.classList.add('active');
+  });
+  currentStage = stage;
+
+  if (stage === 4) runRetrieval();
+  if (stage === 5) buildAugmentation();
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function markDone(stage) {
+  const btn = document.getElementById('pnav-' + stage);
+  if (btn && !btn.classList.contains('active')) btn.classList.add('done');
+}
+
+function resetAll() {
+  selectedDocs = new Set();
+  chunks = [];
+  queryText = '';
+  retrievedChunks = [];
+  embeddingDone = false;
+
+  document.querySelectorAll('.doc-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('docCount').textContent = '0 documents selected';
+  document.getElementById('chunksPanel').style.display = 'none';
+  document.getElementById('embeddingResults').style.display = 'none';
+  document.getElementById('queryEmbedResult').style.display = 'none';
+  document.getElementById('retrievalPanel').style.display = 'none';
+  document.getElementById('responseBox').style.display = 'none';
+  document.getElementById('successBlock').style.display = 'none';
+  document.getElementById('genBtn').disabled = false;
+  document.getElementById('genBtn').textContent = '✨ Generate Answer';
+  document.querySelectorAll('[id^="pnav-"]').forEach(b => {
+    b.classList.remove('done','active');
+  });
+  goTo(0);
+}
+
+// Init: select first 2 docs by default
+toggleDoc(0);
+toggleDoc(2);
+document.getElementById('pnav-0').classList.add('active');
+</script>
 </body>
 </html>
