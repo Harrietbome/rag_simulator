@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Simulator — Interactive Pipeline</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --accent2: #818cf8;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        h1 { text-align: center; font-size: 2.2rem; margin-bottom: 0.5rem; }
+        .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 2rem; font-size: 0.95rem; }
+
+        .pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .stage {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            transition: all 0.4s ease;
+            opacity: 0.4;
+            transform: translateY(20px);
+        }
+        .stage.active {
+            opacity: 1;
+            transform: translateY(0);
+            border-color: var(--accent);
+            box-shadow: 0 0 30px rgba(56,189,248,0.1);
+        }
+        .stage.done { opacity: 1; transform: translateY(0); border-color: var(--success); }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .stage-num {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: var(--border);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+        .stage.active .stage-num { background: var(--accent); color: var(--bg); }
+        .stage.done .stage-num { background: var(--success); color: var(--bg); }
+        .stage-title { font-size: 1.2rem; font-weight: 600; }
+        .stage-desc { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem; }
+
+        .visual-box {
+            background: rgba(15,23,42,0.6);
+            border-radius: 12px;
+            padding: 1rem;
+            min-height: 80px;
+            font-family: 'SF Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px dashed var(--border);
+        }
+
+        .chunk-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 0.5rem;
+        }
+        .chunk {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem;
+            font-size: 0.75rem;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .chunk.highlight {
+            border-color: var(--warning);
+            background: rgba(251,191,36,0.1);
+            transform: scale(1.05);
+        }
+
+        .vector-demo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .vector-bar {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+            height: 60px;
+        }
+        .v-col {
+            width: 8px;
+            background: var(--accent2);
+            border-radius: 2px;
+            transition: height 0.5s ease;
+        }
+        .v-col.query { background: var(--accent); }
+
+        .retrieved-docs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .doc-item {
+            background: var(--bg);
+            border-left: 3px solid var(--warning);
+            padding: 0.75rem 1rem;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .score { color: var(--warning); font-weight: 600; font-size: 0.8rem; }
+
+        .prompt-box {
+            background: var(--bg);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            padding: 1rem;
+            font-size: 0.85rem;
+            line-height: 1.7;
+        }
+        .prompt-label { color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; display: block; }
+        .context-block { background: rgba(56,189,248,0.08); padding: 0.5rem; border-radius: 6px; margin: 0.5rem 0; }
+
+        .answer-box {
+            background: linear-gradient(135deg, rgba(52,211,153,0.1), rgba(56,189,248,0.1));
+            border: 1px solid var(--success);
+            border-radius: 12px;
+            padding: 1.25rem;
+            font-size: 1rem;
+            line-height: 1.7;
+            position: relative;
+        }
+        .answer-box::before {
+            content: "✦ Generated Answer";
+            position: absolute;
+            top: -10px;
+            left: 16px;
+            background: var(--card);
+            padding: 0 8px;
+            color: var(--success);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0 1rem;
+            flex-wrap: wrap;
+        }
+        button {
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(56,189,248,0.3); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+        button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+
+        .input-area {
+            max-width: 900px;
+            margin: 0 auto 2rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+        input[type="text"] {
+            flex: 1;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.9rem 1.2rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: var(--accent); }
+
+        .arrow {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 1.5rem;
+            margin: -0.5rem 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .arrow.show { opacity: 1; }
+
+        .typing-cursor::after {
+            content: "|";
+            animation: blink 1s infinite;
+            color: var(--accent);
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot.waiting { background: var(--border); }
+        .dot.active { background: var(--accent); }
+        .dot.done { background: var(--success); }
+
+        .knowledge-base {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+        .kb-doc {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+        }
+        .kb-doc.active { border-color: var(--accent); box-shadow: 0 0 15px rgba(56,189,248,0.15); }
+        .kb-title { font-weight: 600; color: var(--accent); margin-bottom: 0.4rem; font-size: 0.85rem; }
+        .kb-content { color: var(--text-dim); line-height: 1.5; }
+
+        .similarity-matrix {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .sim-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+        }
+        .sim-label { width: 80px; color: var(--text-dim); text-align: right; }
+        .sim-bar-bg {
+            flex: 1;
+            height: 20px;
+            background: var(--bg);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .sim-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent2), var(--accent));
+            border-radius: 10px;
+            transition: width 1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--bg);
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <h1>🔍 RAG Pipeline Simulator</h1>
+    <p class="subtitle">Watch how Retrieval-Augmented Generation works, step by step</p>
+
+    <div class="input-area">
+        <input type="text" id="queryInput" placeholder="Ask something about space, health, or tech..." value="What are the health benefits of regular exercise?">
+        <button onclick="startRAG()">▶ Run RAG Pipeline</button>
+    </div>
+
+    <div class="controls">
+        <button id="btnStep" onclick="nextStep()" disabled>Next Step →</button>
+        <button class="secondary" onclick="resetSim()">↺ Reset</button>
+        <button class="secondary" onclick="toggleAuto()" id="btnAuto">Auto Play</button>
+    </div>
+
+    <div class="pipeline">
+        <!-- Stage 1: Knowledge Base -->
+        <div class="stage" id="stage1">
+            <div class="stage-header">
+                <div class="stage-num">1</div>
+                <div class="stage-title">Knowledge Base (Documents)</div>
+            </div>
+            <div class="stage-desc">Raw documents that the system can retrieve information from.</div>
+            <div class="visual-box">
+                <div class="knowledge-base" id="kbDisplay"></div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow1">⬇</div>
+
+        <!-- Stage 2: Chunking -->
+        <div class="stage" id="stage2">
+            <div class="stage-header">
+                <div class="stage-num">2</div>
+                <div class="stage-title">Document Chunking</div>
+            </div>
+            <div class="stage-desc">Documents are split into smaller, manageable chunks for better retrieval.</div>
+            <div class="visual-box">
+                <div class="chunk-grid" id="chunkDisplay"></div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow2">⬇</div>
+
+        <!-- Stage 3: Embedding -->
+        <div class="stage" id="stage3">
+            <div class="stage-header">
+                <div class="stage-num">3</div>
+                <div class="stage-title">Vector Embedding</div>
+            </div>
+            <div class="stage-desc">Chunks are converted into high-dimensional vectors using an embedding model.</div>
+            <div class="visual-box">
+                <div class="vector-demo" id="vectorDisplay"></div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow3">⬇</div>
+
+        <!-- Stage 4: Query Embedding -->
+        <div class="stage" id="stage4">
+            <div class="stage-header">
+                <div class="stage-num">4</div>
+                <div class="stage-title">Query Embedding</div>
+            </div>
+            <div class="stage-desc">Your question is also converted into a vector in the same embedding space.</div>
+            <div class="visual-box">
+                <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                    <div style="font-size:1.1rem; max-width:300px;" id="queryText"></div>
+                    <div style="font-size:1.5rem; color:var(--accent);">→</div>
+                    <div class="vector-bar" id="queryVector"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow4">⬇</div>
+
+        <!-- Stage 5: Similarity Search -->
+        <div class="stage" id="stage5">
+            <div class="stage-header">
+                <div class="stage-num">5</div>
+                <div class="stage-title">Similarity Search</div>
+            </div>
+            <div class="stage-desc">The system finds chunks whose vectors are most similar to the query vector.</div>
+            <div class="visual-box">
+                <div class="similarity-matrix" id="similarityDisplay"></div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow5">⬇</div>
+
+        <!-- Stage 6: Retrieval -->
+        <div class="stage" id="stage6">
+            <div class="stage-header">
+                <div class="stage-num">6</div>
+                <div class="stage-title">Context Retrieval</div>
+            </div>
+            <div class="stage-desc">Top-k most relevant chunks are retrieved to provide context for the answer.</div>
+            <div class="visual-box">
+                <div class="retrieved-docs" id="retrievedDisplay"></div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow6">⬇</div>
+
+        <!-- Stage 7: Prompt Construction -->
+        <div class="stage" id="stage7">
+            <div class="stage-header">
+                <div class="stage-num">7</div>
+                <div class="stage-title">Prompt Construction</div>
+            </div>
+            <div class="stage-desc">Retrieved context is injected into a prompt template along with the original question.</div>
+            <div class="visual-box">
+                <div class="prompt-box" id="promptDisplay"></div>
+            </div>
+        </div>
+
+        <div class="arrow" id="arrow7">⬇</div>
+
+        <!-- Stage 8: Generation -->
+        <div class="stage" id="stage8">
+            <div class="stage-header">
+                <div class="stage-num">8</div>
+                <div class="stage-title">LLM Generation</div>
+            </div>
+            <div class="stage-desc">The LLM uses the augmented prompt to generate a grounded, accurate answer.</div>
+            <div class="answer-box" id="answerDisplay">
+                <span class="typing-cursor"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="dot waiting"></div> Waiting</div>
+        <div class="legend-item"><div class="dot active"></div> Active</div>
+        <div class="legend-item"><div class="dot done"></div> Complete</div>
+    </div>
+
+    <script>
+        // ─── Knowledge Base ───
+        const knowledgeBase = [
+            { title: "Exercise & Health", content: "Regular physical activity strengthens the heart, improves circulation, and reduces risk of cardiovascular disease. Adults should aim for 150 minutes of moderate exercise per week." },
+            { title: "Mental Wellness", content: "Exercise releases endorphins and serotonin which improve mood and reduce symptoms of anxiety and depression. Even 30 minutes of walking can boost mental health." },
+            { title: "Sleep Science", content: "Quality sleep is essential for memory consolidation and immune function. Adults need 7-9 hours per night. Poor sleep is linked to obesity and diabetes." },
+            { title: "Nutrition Basics", content: "A balanced diet includes proteins, carbohydrates, healthy fats, vitamins, and minerals. Whole foods are preferable to processed foods for long-term health." },
+            { title: "Space Exploration", content: "NASA's Artemis program aims to return humans to the Moon by the mid-2020s. Mars remains the long-term goal for human colonization efforts." },
+            { title: "AI Technology", content: "Large Language Models use transformer architectures with attention mechanisms. They are trained on vast text corpora and can generate human-like text." }
+        ];
+
+        let currentStep = 0;
+        let autoPlay = false;
+        let autoTimer = null;
+        let userQuery = "";
+        let relevantChunks = [];
+
+        const stages = 8;
+
+        function resetSim() {
+            currentStep = 0;
+            autoPlay = false;
+            clearInterval(autoTimer);
+            document.getElementById('btnAuto').textContent = "Auto Play";
+            document.getElementById('btnStep').disabled = false;
+
+            for (let i = 1; i <= stages; i++) {
+                document.getElementById('stage' + i).className = 'stage';
+                document.getElementById('arrow' + i).className = 'arrow';
+            }
+            document.getElementById('kbDisplay').innerHTML = '';
+            document.getElementById('chunkDisplay').innerHTML = '';
+            document.getElementById('vectorDisplay').innerHTML = '';
+            document.getElementById('queryText').innerHTML = '';
+            document.getElementById('queryVector').innerHTML = '';
+            document.getElementById('similarityDisplay').innerHTML = '';
+            document.getElementById('retrievedDisplay').innerHTML = '';
+            document.getElementById('promptDisplay').innerHTML = '';
+            document.getElementById('answerDisplay').innerHTML = '<span class="typing-cursor"></span>';
+        }
+
+        function startRAG() {
+            resetSim();
+            userQuery = document.getElementById('queryInput').value.trim() || "What are the health benefits of regular exercise?";
+            nextStep();
+        }
+
+        function toggleAuto() {
+            autoPlay = !autoPlay;
+            document.getElementById('btnAuto').textContent = autoPlay ? "⏸ Pause" : "Auto Play";
+            if (autoPlay && currentStep < stages) {
+                autoTimer = setInterval(() => {
+                    if (currentStep >= stages) {
+                        autoPlay = false;
+                        clearInterval(autoTimer);
+                        document.getElementById('btnAuto').textContent = "Auto Play";
+                        return;
+                    }
+                    nextStep();
+                }, 1800);
+            } else {
+                clearInterval(autoTimer);
+            }
+        }
+
+        function nextStep() {
+            currentStep++;
+            if (currentStep > stages) return;
+
+            // Mark previous as done
+            if (currentStep > 1) {
+                document.getElementById('stage' + (currentStep - 1)).className = 'stage done';
+                document.getElementById('arrow' + (currentStep - 1)).className = 'arrow show';
+            }
+
+            // Activate current
+            const stageEl = document.getElementById('stage' + currentStep);
+            stageEl.className = 'stage active';
+            stageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            executeStep(currentStep);
+
+            if (currentStep === stages) {
+                document.getElementById('btnStep').disabled = true;
+                clearInterval(autoTimer);
+                autoPlay = false;
+                document.getElementById('btnAuto').textContent = "Auto Play";
+            }
+        }
+
+        function executeStep(step) {
+            switch(step) {
+                case 1: renderKnowledgeBase(); break;
+                case 2: renderChunks(); break;
+                case 3: renderEmbeddings(); break;
+                case 4: renderQueryEmbedding(); break;
+                case 5: renderSimilarity(); break;
+                case 6: renderRetrieved(); break;
+                case 7: renderPrompt(); break;
+                case 8: renderAnswer(); break;
+            }
+        }
+
+        // ─── Step 1: Knowledge Base ───
+        function renderKnowledgeBase() {
+            const container = document.getElementById('kbDisplay');
+            container.innerHTML = knowledgeBase.map((doc, i) => `
+                <div class="kb-doc" id="kb-${i}">
+                    <div class="kb-title">📄 ${doc.title}</div>
+                    <div class="kb-content">${doc.content}</div>
+                </div>
+            `).join('');
+
+            // Highlight relevant docs based on query keywords
+            const q = userQuery.toLowerCase();
+            knowledgeBase.forEach((doc, i) => {
+                const text = (doc.title + ' ' + doc.content).toLowerCase();
+                const score = keywordMatchScore(q, text);
+                if (score > 0) {
+                    setTimeout(() => {
+                        document.getElementById('kb-' + i).classList.add('active');
+                    }, i * 200);
+                }
+            });
+        }
+
+        // ─── Step 2: Chunking ───
+        function renderChunks() {
+            const container = document.getElementById('chunkDisplay');
+            let allChunks = [];
+            knowledgeBase.forEach((doc, di) => {
+                const sentences = doc.content.match(/[^.!?]+[.!?]+/g) || [doc.content];
+                sentences.forEach((sent, si) => {
+                    allChunks.push({ text: sent.trim(), docIdx: di, chunkIdx: si, docTitle: doc.title });
+                });
+            });
+
+            container.innerHTML = allChunks.map((chunk, i) => `
+                <div class="chunk" id="chunk-${i}" title="From: ${chunk.docTitle}">
+                    <div style="font-weight:600; margin-bottom:4px; font-size:0.7rem; color:var(--accent);">${chunk.docTitle}</div>
+                    ${chunk.text.substring(0, 60)}${chunk.text.length > 60 ? '...' : ''}
+                </div>
+            `).join('');
+
+            // Determine relevance
+            const q = userQuery.toLowerCase();
+            relevantChunks = allChunks.map((chunk, i) => {
+                const score = keywordMatchScore(q, (chunk.docTitle + ' ' + chunk.text).toLowerCase());
+                return { ...chunk, idx: i, score };
+            }).sort((a, b) => b.score - a.score);
+
+            // Highlight top chunks
+            const topIndices = relevantChunks.slice(0, 4).map(c => c.idx);
+            setTimeout(() => {
+                topIndices.forEach((idx, i) => {
+                    setTimeout(() => {
+                        document.getElementById('chunk-' + idx).classList.add('highlight');
+                    }, i * 250);
+                });
+            }, 400);
+        }
+
+        // ─── Step 3: Vector Embeddings ───
+        function renderEmbeddings() {
+            const container = document.getElementById('vectorDisplay');
+            // Show a few representative vectors
+            const sampleChunks = relevantChunks.slice(0, 4);
+
+            container.innerHTML = sampleChunks.map((chunk, i) => {
+                const bars = generateVectorBars(16, chunk.score);
+                return `
+                    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+                        <div style="width:120px; font-size:0.75rem; color:var(--text-dim); text-align:right;">${chunk.docTitle} #${chunk.chunkIdx + 1}</div>
+                        <div class="vector-bar">${bars}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function generateVectorBars(count, relevance) {
+            let html = '';
+            for (let i = 0; i < count; i++) {
+                const h = Math.floor(Math.random() * 40 + 10 + (relevance * 15));
+                html += `<div class="v-col" style="height:${h}px"></div>`;
+            }
+            return html;
+        }
+
+        // ─── Step 4: Query Embedding ───
+        function renderQueryEmbedding() {
+            document.getElementById('queryText').textContent = `"${userQuery}"`;
+            const bars = generateVectorBars(16, 1.0).replace(/v-col/g, 'v-col query');
+            document.getElementById('queryVector').innerHTML = bars;
+        }
+
+        // ─── Step 5: Similarity Search ───
+        function renderSimilarity() {
+            const container = document.getElementById('similarityDisplay');
+            const topChunks = relevantChunks.slice(0, 5);
+
+            container.innerHTML = topChunks.map((chunk, i) => {
+                const pct = Math.min(95, Math.round((chunk.score / (relevantChunks[0].score || 1)) * 100));
+                return `
+                    <div class="sim-row">
+                        <div class="sim-label">${chunk.docTitle}</div>
+                        <div class="sim-bar-bg">
+                            <div class="sim-bar" style="width:0%" id="sim-bar-${i}">${pct}%</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            setTimeout(() => {
+                topChunks.forEach((_, i) => {
+                    const bar = document.getElementById('sim-bar-' + i);
+                    if (bar) bar.style.width = bar.textContent;
+                });
+            }, 300);
+        }
+
+        // ─── Step 6: Retrieved Context ───
+        function renderRetrieved() {
+            const container = document.getElementById('retrievedDisplay');
+            const top3 = relevantChunks.slice(0, 3);
+
+            container.innerHTML = top3.map((chunk, i) => `
+                <div class="doc-item" style="animation: fadeIn 0.5s ${i * 0.2}s both;">
+                    <span>📄 <b>${chunk.docTitle}</b> — ${chunk.text.substring(0, 90)}...</span>
+                    <span class="score">Score: ${(chunk.score * 100).toFixed(1)}</span>
+                </div>
+            `).join('');
+        }
+
+        // ─── Step 7: Prompt Construction ───
+        function renderPrompt() {
+            const top3 = relevantChunks.slice(0, 3);
+            const context = top3.map((c, i) => `[${i + 1}] ${c.text}`).join('
+
+');
+
+            const promptHTML = `
+                <span class="prompt-label">SYSTEM</span>
+                You are a helpful assistant. Use the provided context to answer the user's question accurately. If the context doesn't contain the answer, say you don't know.<br><br>
+
+                <span class="prompt-label">CONTEXT</span>
+                <div class="context-block">${context.replace(/
+/g, '<br>')}</div>
+
+                <span class="prompt-label">USER QUESTION</span>
+                ${userQuery}<br><br>
+
+                <span class="prompt-label">INSTRUCTION</span>
+                Based on the context above, provide a clear and concise answer to the question.
+            `;
+
+            document.getElementById('promptDisplay').innerHTML = promptHTML;
+        }
+
+        // ─── Step 8: Generate Answer ───
+        function renderAnswer() {
+            const answerBox = document.getElementById('answerDisplay');
+            const topChunks = relevantChunks.slice(0, 3);
+
+            // Generate a simple answer based on retrieved chunks
+            let answer = generateAnswer(userQuery, topChunks);
+
+            answerBox.innerHTML = '';
+            let i = 0;
+            const typeInterval = setInterval(() => {
+                if (i < answer.length) {
+                    answerBox.innerHTML += answer.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typeInterval);
+                    answerBox.innerHTML += '<span class="typing-cursor"></span>';
+                }
+            }, 25);
+        }
+
+        function generateAnswer(query, chunks) {
+            const q = query.toLowerCase();
+
+            if (q.includes('exercise') || q.includes('health benefit') || q.includes('workout')) {
+                return "Regular exercise offers numerous health benefits: it strengthens the cardiovascular system and improves circulation, reducing the risk of heart disease. It also releases endorphins and serotonin, which significantly improve mood and reduce anxiety and depression symptoms. Experts recommend at least 150 minutes of moderate exercise per week for adults, and even just 30 minutes of walking can provide mental health benefits.";
+            }
+            if (q.includes('sleep')) {
+                return "Quality sleep is crucial for overall health. Adults need 7-9 hours per night for optimal memory consolidation and immune function. Poor sleep quality has been linked to increased risks of obesity and diabetes. Maintaining a consistent sleep schedule and creating a restful environment can significantly improve sleep quality.";
+            }
+            if (q.includes('space') || q.includes('moon') || q.includes('mars') || q.includes('nasa')) {
+                return "NASA's Artemis program is working to return humans to the Moon by the mid-2020s, with the ultimate long-term goal of establishing a sustainable presence there. Mars remains the primary target for future human colonization efforts, representing the next major milestone in space exploration.";
+            }
+            if (q.includes('ai') || q.includes('llm') || q.includes('model') || q.includes('transformer')) {
+                return "Large Language Models (LLMs) are built on transformer architectures that use attention mechanisms to process text. They are trained on vast text corpora and can generate human-like text, answer questions, and assist with various tasks. RAG (Retrieval-Augmented Generation) enhances LLMs by grounding their responses in retrieved external documents.";
+            }
+            if (q.includes('nutrition') || q.includes('diet') || q.includes('food')) {
+                return "A balanced diet is fundamental to good health. It should include adequate proteins, carbohydrates, healthy fats, vitamins, and minerals. Whole foods — such as fruits, vegetables, whole grains, and lean proteins — are generally preferable to processed foods for maintaining long-term health and preventing chronic diseases.";
+            }
+
+            // Generic fallback
+            const contextSummary = chunks.map(c => c.text).join(' ');
+            return `Based on the retrieved context, here's what I found: ${contextSummary.substring(0, 200)}... This information suggests that the topic involves ${chunks[0]?.docTitle || 'the queried subject'}. For more specific details, you may want to consult additional sources on this topic.`;
+        }
+
+        // ─── Utility: Simple keyword matching for demo ───
+        function keywordMatchScore(query, text) {
+            const qWords = query.toLowerCase().split(/\W+/).filter(w => w.length > 2);
+            const tWords = text.toLowerCase().split(/\W+/);
+            let score = 0;
+            qWords.forEach(qw => {
+                const matches = tWords.filter(tw => tw.includes(qw) || qw.includes(tw)).length;
+                score += matches;
+            });
+            // Add title boost
+            if (text.includes(query.toLowerCase().split(' ')[0])) score += 2;
+            return score;
+        }
+
+        // Add fade-in animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateX(-10px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
